@@ -1,506 +1,270 @@
-/* =========================================================================
-   Pulse — budget du foyer
-   Direction : fintech sobre. Fond gris-bleu très clair, cartes blanches
-   arrondies avec ombre douce, accent indigo, vert/rouge réservés aux
-   montants. Typographie Inter, une seule famille pour tout — display,
-   corps de texte et chiffres — avec des poids contrastés.
-   ========================================================================= */
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pulse — Budget du foyer</title>
+<meta name="description" content="Suivi de budget à partir des relevés bancaires CSV : tableau de bord par catégorie, vue mensuelle, virements et transactions non catégorisées.">
 
-:root {
-  --fond: #F6F7FB;
-  --carte: #FFFFFF;
-  --bordure: #E7E9F1;
-  --bordure-forte: #D7DAE6;
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 
-  --texte: #15182B;
-  --texte-att: #6B7088;
-  --texte-faible: #9499AD;
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
 
-  --accent: #5B5FEF;
-  --accent-fonce: #4144C4;
-  --accent-fond: #EEEEFD;
+<div class="shell">
 
-  --vert: #12A35E;
-  --vert-fond: #E9F9F1;
-  --rouge: #E5484D;
-  --rouge-fond: #FDEEEE;
+  <!-- ============ Sidebar ============ -->
+  <aside class="sidebar">
+    <div class="sidebar__brand">
+      <span class="sidebar__mark">P</span>
+      <span class="sidebar__nom">Pulse</span>
+    </div>
 
-  --rayon-s: 8px;
-  --rayon: 12px;
-  --rayon-l: 16px;
-  --ombre: 0 1px 2px rgba(21, 24, 43, 0.04), 0 1px 1px rgba(21, 24, 43, 0.03);
-  --ombre-hover: 0 4px 16px rgba(21, 24, 43, 0.08);
+    <nav class="sidebar__nav" role="tablist">
+      <button class="nav-item active" data-panel="dashboard" role="tab">
+        <svg viewBox="0 0 20 20" fill="none"><path d="M3 13.5h3v3.5H3v-3.5Zm5.5-6h3v9.5h-3v-9.5ZM14 8h3v9h-3V8Z" fill="currentColor"/></svg>
+        Tableau de bord
+      </button>
+      <button class="nav-item" data-panel="croise" role="tab">
+        <svg viewBox="0 0 20 20" fill="none"><rect x="3" y="3" width="14" height="14" rx="2" stroke="currentColor" stroke-width="1.6"/><path d="M3 8h14M8 3v14" stroke="currentColor" stroke-width="1.6"/></svg>
+        Vue mensuelle
+      </button>
+      <button class="nav-item" data-panel="virements" role="tab">
+        <svg viewBox="0 0 20 20" fill="none"><path d="M4 7h10M14 7l-3-3M14 7l-3 3M16 13H6M6 13l3-3M6 13l3 3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        Virements
+        <span class="nav-badge cache" id="badge-virements">0</span>
+      </button>
+      <button class="nav-item" data-panel="noncat" role="tab">
+        <svg viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="7" stroke="currentColor" stroke-width="1.6"/><path d="M10 6.5v4M10 13.2v.1" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+        À catégoriser
+        <span class="nav-badge cache" id="badge-noncat">0</span>
+      </button>
+      <button class="nav-item" data-panel="analyses" role="tab">
+        <svg viewBox="0 0 20 20" fill="none"><path d="M3 14.5 7.5 9l3.5 3 4-5.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><circle cx="3" cy="14.5" r="1" fill="currentColor"/><circle cx="7.5" cy="9" r="1" fill="currentColor"/><circle cx="11" cy="12" r="1" fill="currentColor"/><circle cx="15" cy="6.5" r="1" fill="currentColor"/></svg>
+        Analyses
+      </button>
+      <button class="nav-item" data-panel="import" role="tab">
+        <svg viewBox="0 0 20 20" fill="none"><path d="M10 13V4M6.5 7.5 10 4l3.5 3.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 13.5v1.2a1.3 1.3 0 0 0 1.3 1.3h9.4a1.3 1.3 0 0 0 1.3-1.3v-1.2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+        Importer
+      </button>
+    </nav>
 
-  --font: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-}
+    <div class="sidebar__bas">
+      <button class="nav-item nav-item--danger" id="btn-reset">
+        <svg viewBox="0 0 20 20" fill="none"><path d="M4 6h12M8 6V4.5a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1V6m-7 0 .6 9.4a1.5 1.5 0 0 0 1.5 1.4h3.8a1.5 1.5 0 0 0 1.5-1.4L15 6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        Réinitialiser
+      </button>
+    </div>
+  </aside>
 
-* { box-sizing: border-box; }
+  <!-- ============ Contenu principal ============ -->
+  <div class="main">
 
-html, body {
-  margin: 0;
-  padding: 0;
-  background: var(--fond);
-  color: var(--texte);
-  font-family: var(--font);
-  font-size: 14.5px;
-  line-height: 1.5;
-  -webkit-font-smoothing: antialiased;
-}
+    <header class="topbar">
+      <div class="topbar__titre" id="topbar-titre">Tableau de bord</div>
+      <div class="topbar__droite">
+        <div class="segmente" id="filtre-personne" role="tablist">
+          <button class="segmente__item active" data-valeur="tous">Tous</button>
+          <button class="segmente__item" data-valeur="monsieur">Monsieur</button>
+          <button class="segmente__item" data-valeur="madame">Madame</button>
+        </div>
+        <button class="btn-accent" id="btn-importer-topbar">
+          <svg viewBox="0 0 20 20" fill="none"><path d="M10 13V4M6.5 7.5 10 4l3.5 3.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 13.5v1.2a1.3 1.3 0 0 0 1.3 1.3h9.4a1.3 1.3 0 0 0 1.3-1.3v-1.2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+          Importer un relevé
+        </button>
+      </div>
+    </header>
 
-::selection { background: var(--accent-fond); color: var(--accent-fonce); }
+    <main class="contenu">
 
-.mono { font-variant-numeric: tabular-nums; font-feature-settings: 'tnum'; }
-.vide { color: var(--texte-att); padding: 1.2em 0; }
-.pos { color: var(--vert); }
-.neg { color: var(--rouge); }
-.cache { display: none !important; }
-.al-droite { text-align: right; }
+      <!-- ============ Tableau de bord ============ -->
+      <section class="panel-principal active" id="panel-dashboard">
 
-.sr-only {
-  position: absolute; width: 1px; height: 1px;
-  padding: 0; margin: -1px; overflow: hidden;
-  clip: rect(0,0,0,0); white-space: nowrap; border: 0;
-}
+        <div id="dashboard-vide" class="etat-vide">
+          <div class="etat-vide__icone">
+            <svg viewBox="0 0 48 48" fill="none"><rect x="8" y="14" width="32" height="26" rx="3" stroke="currentColor" stroke-width="2"/><path d="M8 20h32" stroke="currentColor" stroke-width="2"/><path d="M16 28h6M16 33h10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M24 6v8M19 10l5-4 5 4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </div>
+          <h2>Aucune donnée pour le moment</h2>
+          <p>Importe un relevé bancaire pour faire vivre ton tableau de bord.</p>
+          <button class="btn-accent" id="btn-importer-vide">Importer un relevé</button>
+        </div>
 
-.dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 0.55em; flex-shrink: 0; }
+        <div id="dashboard-contenu" class="cache">
+          <section class="kpi-grid">
+            <div class="kpi-carte">
+              <span class="kpi-carte__label">Revenus</span>
+              <span class="kpi-carte__valeur pos" id="dash-revenus">0,00 €</span>
+            </div>
+            <div class="kpi-carte">
+              <span class="kpi-carte__label">Dépenses</span>
+              <span class="kpi-carte__valeur neg" id="dash-depenses">0,00 €</span>
+            </div>
+            <div class="kpi-carte kpi-carte--accent">
+              <span class="kpi-carte__label">Solde net</span>
+              <span class="kpi-carte__valeur" id="dash-net">0,00 €</span>
+            </div>
+            <div class="kpi-carte">
+              <span class="kpi-carte__label">Mois couverts</span>
+              <span class="kpi-carte__valeur" id="dash-nb-mois">0</span>
+            </div>
+          </section>
 
-button { font-family: inherit; }
-:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+          <div class="grille-graphiques">
+            <section class="carte carte--large">
+              <div class="carte__entete">
+                <h3>Dépenses par mois</h3>
+                <p>Réparties par catégorie</p>
+              </div>
+              <div class="carte__corps chart-zone"><canvas id="chart-par-mois"></canvas></div>
+            </section>
+            <section class="carte">
+              <div class="carte__entete">
+                <h3>Cumulé par catégorie</h3>
+                <p>Sur toute la période</p>
+              </div>
+              <div class="carte__corps chart-zone"><canvas id="chart-par-categorie"></canvas></div>
+            </section>
+          </div>
+        </div>
+      </section>
 
-/* ---------- Layout général ---------- */
+      <!-- ============ Vue mensuelle ============ -->
+      <section class="panel-principal" id="panel-croise">
+        <section class="carte">
+          <div class="carte__entete">
+            <h3>Catégories × mois</h3>
+            <p>Total des dépenses par catégorie pour chaque mois disponible</p>
+            <button class="btn-export cache" id="btn-export-croise">
+              <svg viewBox="0 0 20 20" fill="none"><path d="M10 3v9M6.5 8.5 10 12l3.5-3.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 13.5v1.2a1.3 1.3 0 0 0 1.3 1.3h9.4a1.3 1.3 0 0 0 1.3-1.3v-1.2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+              Exporter CSV
+            </button>
+          </div>
+          <div class="carte__corps" id="tableau-croise"></div>
+        </section>
+      </section>
 
-.shell {
-  display: flex;
-  min-height: 100vh;
-}
+      <!-- ============ Analyses ============ -->
+      <section class="panel-principal" id="panel-analyses">
 
-/* ---------- Sidebar ---------- */
+        <div id="analyses-vide" class="etat-vide">
+          <div class="etat-vide__icone">
+            <svg viewBox="0 0 48 48" fill="none"><path d="M6 36 16 22l8 7 10-13 8 9" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="6" cy="36" r="2" fill="currentColor"/><circle cx="16" cy="22" r="2" fill="currentColor"/><circle cx="24" cy="29" r="2" fill="currentColor"/><circle cx="34" cy="16" r="2" fill="currentColor"/><circle cx="42" cy="25" r="2" fill="currentColor"/></svg>
+          </div>
+          <h2>Aucune donnée pour le moment</h2>
+          <p>Importe un relevé bancaire pour afficher les courbes par catégorie.</p>
+          <button class="btn-accent" id="btn-importer-analyses">Importer un relevé</button>
+        </div>
 
-.sidebar {
-  width: 232px;
-  flex-shrink: 0;
-  background: var(--carte);
-  border-right: 1px solid var(--bordure);
-  display: flex;
-  flex-direction: column;
-  padding: 1.4em 1em;
-  position: sticky;
-  top: 0;
-  height: 100vh;
-}
+        <div id="analyses-contenu" class="cache">
+          <section class="carte">
+            <div class="carte__entete">
+              <h3>Évolution mensuelle par catégorie</h3>
+              <p>Un graphique par catégorie de dépense</p>
+            </div>
+            <div class="carte__corps" id="analyses-graphiques"></div>
+          </section>
 
-.sidebar__brand {
-  display: flex;
-  align-items: center;
-  gap: 0.65em;
-  padding: 0.4em 0.6em 1.6em;
-}
-.sidebar__mark {
-  width: 30px; height: 30px;
-  border-radius: 9px;
-  background: linear-gradient(135deg, var(--accent), #8B8EF5);
-  color: #fff;
-  display: flex; align-items: center; justify-content: center;
-  font-weight: 800;
-  font-size: 0.95rem;
-}
-.sidebar__nom {
-  font-weight: 800;
-  font-size: 1.05rem;
-  letter-spacing: -0.01em;
-}
+          <section class="carte" style="margin-top:1.5rem">
+            <div class="carte__entete">
+              <h3>Récapitulatif par catégorie</h3>
+            </div>
+            <div class="carte__corps" id="analyses-recap"></div>
+          </section>
+        </div>
+      </section>
 
-.sidebar__nav {
-  display: flex;
-  flex-direction: column;
-  gap: 0.2em;
-  flex: 1;
-}
+      <!-- ============ Virements ============ -->
+      <section class="panel-principal" id="panel-virements">
+        <section class="carte">
+          <div class="carte__entete">
+            <h3>Virements internes</h3>
+            <p>Mouvements entre comptes du foyer, exclus des statistiques de dépenses</p>
+          </div>
+          <div class="carte__corps table-wrap">
+            <table>
+              <thead><tr><th>Date</th><th>Libellé</th><th>Personne</th><th>Détail</th><th class="al-droite">Montant</th></tr></thead>
+              <tbody id="virements-corps"></tbody>
+            </table>
+          </div>
+        </section>
+      </section>
 
-.nav-item {
-  display: flex;
-  align-items: center;
-  gap: 0.7em;
-  background: none;
-  border: none;
-  border-radius: var(--rayon-s);
-  padding: 0.6em 0.7em;
-  font-size: 0.88rem;
-  font-weight: 500;
-  color: var(--texte-att);
-  cursor: pointer;
-  text-align: left;
-  width: 100%;
-  transition: background 0.12s ease, color 0.12s ease;
-}
-.nav-item svg { width: 18px; height: 18px; flex-shrink: 0; }
-.nav-item:hover { background: var(--fond); color: var(--texte); }
-.nav-item.active { background: var(--accent-fond); color: var(--accent-fonce); font-weight: 600; }
+      <!-- ============ Non catégorisées ============ -->
+      <section class="panel-principal" id="panel-noncat">
+        <section class="carte">
+          <div class="carte__entete">
+            <h3>Transactions à catégoriser</h3>
+            <p>Mouvements que la banque n'a pas su classer automatiquement</p>
+          </div>
+          <div class="carte__corps table-wrap">
+            <table>
+              <thead><tr><th>Date</th><th>Libellé</th><th>Personne</th><th>Détail</th><th class="al-droite">Montant</th></tr></thead>
+              <tbody id="noncat-corps"></tbody>
+            </table>
+          </div>
+        </section>
+      </section>
 
-.nav-badge {
-  margin-left: auto;
-  background: var(--rouge);
-  color: #fff;
-  font-size: 0.68rem;
-  font-weight: 700;
-  padding: 0.1em 0.5em;
-  border-radius: 999px;
-  line-height: 1.5;
-}
-.nav-item.active .nav-badge { background: var(--accent); }
+      <!-- ============ Import ============ -->
+      <section class="panel-principal" id="panel-import">
+        <div class="import-grid">
+          <section class="carte import-carte" data-personne-couleur="monsieur">
+            <div class="import-carte__entete">
+              <span class="import-carte__avatar">M</span>
+              <div>
+                <h3>Monsieur</h3>
+                <p>Relevé du compte de Monsieur</p>
+              </div>
+            </div>
+            <label class="zone-upload" for="input-csv-monsieur">
+              <svg viewBox="0 0 32 32" fill="none"><path d="M16 21V8M10 13.5 16 8l6 5.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M6 21.5v2A2.5 2.5 0 0 0 8.5 26h15a2.5 2.5 0 0 0 2.5-2.5v-2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+              <span class="zone-upload__texte">Glisse un CSV ou clique pour choisir</span>
+              <span class="zone-upload__precision">Export bancaire, séparateur «&nbsp;;&nbsp;»</span>
+            </label>
+            <input type="file" id="input-csv-monsieur" accept=".csv,text/csv" class="sr-only">
+          </section>
 
-.sidebar__bas {
-  border-top: 1px solid var(--bordure);
-  padding-top: 0.6em;
-}
-.nav-item--danger:hover { background: var(--rouge-fond); color: var(--rouge); }
+          <section class="carte import-carte" data-personne-couleur="madame">
+            <div class="import-carte__entete">
+              <span class="import-carte__avatar">M</span>
+              <div>
+                <h3>Madame</h3>
+                <p>Relevé du compte de Madame</p>
+              </div>
+            </div>
+            <label class="zone-upload" for="input-csv-madame">
+              <svg viewBox="0 0 32 32" fill="none"><path d="M16 21V8M10 13.5 16 8l6 5.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M6 21.5v2A2.5 2.5 0 0 0 8.5 26h15a2.5 2.5 0 0 0 2.5-2.5v-2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+              <span class="zone-upload__texte">Glisse un CSV ou clique pour choisir</span>
+              <span class="zone-upload__precision">Export bancaire, séparateur «&nbsp;;&nbsp;»</span>
+            </label>
+            <input type="file" id="input-csv-madame" accept=".csv,text/csv" class="sr-only">
+          </section>
+        </div>
 
-/* ---------- Zone principale ---------- */
+        <div id="import-statut"></div>
 
-.main {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-}
+        <section class="carte">
+          <div class="carte__entete">
+            <h3>Historique des imports</h3>
+          </div>
+          <div class="carte__corps" id="import-historique"></div>
+        </section>
+      </section>
 
-.topbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 1.3em 2em;
-  border-bottom: 1px solid var(--bordure);
-  background: var(--carte);
-  position: sticky;
-  top: 0;
-  z-index: 10;
-}
-.topbar__titre {
-  font-size: 1.2rem;
-  font-weight: 700;
-  letter-spacing: -0.01em;
-}
-.topbar__droite {
-  display: flex;
-  align-items: center;
-  gap: 0.9em;
-}
+    </main>
+  </div>
+</div>
 
-.segmente {
-  display: flex;
-  background: var(--fond);
-  border-radius: var(--rayon-s);
-  padding: 3px;
-  gap: 2px;
-}
-.segmente__item {
-  background: none;
-  border: none;
-  padding: 0.4em 0.85em;
-  font-size: 0.82rem;
-  font-weight: 600;
-  color: var(--texte-att);
-  border-radius: 6px;
-  cursor: pointer;
-}
-.segmente__item.active { background: var(--carte); color: var(--texte); box-shadow: var(--ombre); }
+<!-- Toast de confirmation -->
+<div class="toast" id="toast"></div>
 
-.btn-accent {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5em;
-  background: var(--accent);
-  color: #fff;
-  border: none;
-  border-radius: var(--rayon-s);
-  padding: 0.62em 1.1em;
-  font-size: 0.85rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background 0.12s ease, transform 0.08s ease;
-}
-.btn-accent svg { width: 16px; height: 16px; }
-.btn-accent:hover { background: var(--accent-fonce); }
-.btn-accent:active { transform: scale(0.98); }
-
-.contenu {
-  padding: 2em;
-  max-width: 1320px;
-  width: 100%;
-  margin: 0 auto;
-}
-
-.panel-principal { display: none; }
-.panel-principal.active { display: block; animation: apparition 0.18s ease; }
-
-@keyframes apparition {
-  from { opacity: 0; transform: translateY(4px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
-/* ---------- État vide ---------- */
-
-.etat-vide {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  text-align: center;
-  padding: 5em 2em;
-  background: var(--carte);
-  border: 1px solid var(--bordure);
-  border-radius: var(--rayon-l);
-}
-.etat-vide__icone {
-  width: 72px; height: 72px;
-  border-radius: 50%;
-  background: var(--accent-fond);
-  color: var(--accent);
-  display: flex; align-items: center; justify-content: center;
-  margin-bottom: 1.2em;
-}
-.etat-vide__icone svg { width: 36px; height: 36px; }
-.etat-vide h2 { font-size: 1.15rem; margin: 0 0 0.4em; }
-.etat-vide p { color: var(--texte-att); margin: 0 0 1.6em; max-width: 360px; }
-
-/* ---------- KPI ---------- */
-
-.kpi-grid {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 1em;
-  margin-bottom: 1.6em;
-}
-@media (max-width: 900px) { .kpi-grid { grid-template-columns: repeat(2, 1fr); } }
-
-.kpi-carte {
-  background: var(--carte);
-  border: 1px solid var(--bordure);
-  border-radius: var(--rayon);
-  padding: 1.2em 1.3em;
-  box-shadow: var(--ombre);
-}
-.kpi-carte--accent { background: var(--accent); border-color: var(--accent); }
-.kpi-carte--accent .kpi-carte__label { color: rgba(255,255,255,0.75); }
-.kpi-carte--accent .kpi-carte__valeur { color: #fff; }
-
-.kpi-carte__label {
-  display: block;
-  font-size: 0.76rem;
-  font-weight: 600;
-  color: var(--texte-att);
-  margin-bottom: 0.5em;
-}
-.kpi-carte__valeur {
-  display: block;
-  font-size: 1.55rem;
-  font-weight: 800;
-  letter-spacing: -0.02em;
-  font-variant-numeric: tabular-nums;
-}
-
-/* ---------- Cartes / graphiques ---------- */
-
-.grille-graphiques {
-  display: grid;
-  grid-template-columns: 1.4fr 1fr;
-  gap: 1.2em;
-}
-@media (max-width: 1000px) { .grille-graphiques { grid-template-columns: 1fr; } }
-
-.carte {
-  background: var(--carte);
-  border: 1px solid var(--bordure);
-  border-radius: var(--rayon);
-  box-shadow: var(--ombre);
-  margin-bottom: 1.2em;
-}
-.carte:last-child { margin-bottom: 0; }
-.carte__entete { padding: 1.3em 1.4em 0.2em; }
-.carte__entete h3 { margin: 0 0 0.2em; font-size: 1rem; font-weight: 700; }
-.carte__entete p { margin: 0; font-size: 0.82rem; color: var(--texte-att); }
-.carte__corps { padding: 1.2em 1.4em 1.4em; }
-
-.chart-zone { height: 320px; }
-.chart-zone--tall { height: 460px; }
-
-/* Grille de mini-graphiques (panel Analyses) */
-#analyses-graphiques {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  gap: 1.25rem;
-  padding: 0.25rem 0 0.5rem;
-}
-.mini-chart-carte {
-  background: var(--fond);
-  border: 1px solid var(--bordure);
-  border-radius: var(--rayon);
-  padding: 0.85rem 1rem 0.75rem;
-}
-.mini-chart-titre {
-  display: flex;
-  align-items: center;
-  font-size: 0.8rem;
-  font-weight: 600;
-  color: var(--texte);
-  margin-bottom: 0.65rem;
-}
-.mini-chart-zone { height: 140px; }
-
-/* ---------- Tableaux ---------- */
-
-.table-wrap { overflow-x: auto; padding: 0 !important; }
-table { width: 100%; border-collapse: collapse; font-size: 0.86rem; }
-thead th {
-  text-align: left;
-  font-size: 0.72rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--texte-att);
-  padding: 0.85em 1.4em;
-  border-bottom: 1px solid var(--bordure);
-  white-space: nowrap;
-}
-tbody td {
-  padding: 0.75em 1.4em;
-  border-bottom: 1px solid var(--bordure);
-  vertical-align: middle;
-}
-tbody tr:last-child td { border-bottom: none; }
-tbody tr:hover { background: var(--fond); }
-td.montant { text-align: right; font-weight: 700; white-space: nowrap; font-variant-numeric: tabular-nums; }
-
-.tag {
-  display: inline-flex;
-  align-items: center;
-  font-size: 0.74rem;
-  font-weight: 600;
-  padding: 0.25em 0.65em;
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--tag-color, #999) 12%, white);
-  color: var(--tag-color, #555);
-}
-
-/* ---------- Tableau croisé ---------- */
-
-.table-croisee th, .table-croisee td { text-align: right; }
-.table-croisee th:first-child, .table-croisee td:first-child { text-align: left; }
-.table-croisee .total-col { border-left: 2px solid var(--bordure); font-weight: 700; }
-.table-croisee .cellule-vide { color: var(--bordure-forte); }
-.table-croisee .ligne-total td {
-  font-weight: 800;
-  background: var(--fond);
-  border-top: 2px solid var(--texte);
-}
-
-/* ---------- Onglet Import ---------- */
-
-.import-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 1.2em;
-  margin-bottom: 1.2em;
-}
-@media (max-width: 760px) { .import-grid { grid-template-columns: 1fr; } }
-
-.import-carte { padding: 1.4em; }
-.import-carte__entete {
-  display: flex;
-  align-items: center;
-  gap: 0.8em;
-  margin-bottom: 1.2em;
-}
-.import-carte__avatar {
-  width: 38px; height: 38px;
-  border-radius: 50%;
-  display: flex; align-items: center; justify-content: center;
-  font-weight: 700;
-  font-size: 0.95rem;
-  color: #fff;
-  flex-shrink: 0;
-}
-.import-carte[data-personne-couleur="monsieur"] .import-carte__avatar { background: #4F6BFF; }
-.import-carte[data-personne-couleur="madame"] .import-carte__avatar { background: #D6589F; }
-.import-carte h3 { margin: 0; font-size: 0.98rem; font-weight: 700; }
-.import-carte p { margin: 0.1em 0 0; font-size: 0.8rem; color: var(--texte-att); }
-
-.zone-upload {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  text-align: center;
-  gap: 0.5em;
-  border: 1.5px dashed var(--bordure-forte);
-  border-radius: var(--rayon);
-  padding: 2.2em 1.2em;
-  cursor: pointer;
-  color: var(--texte-att);
-  transition: border-color 0.12s ease, background 0.12s ease;
-}
-.zone-upload:hover { border-color: var(--accent); background: var(--accent-fond); color: var(--accent-fonce); }
-.zone-upload svg { width: 30px; height: 30px; margin-bottom: 0.2em; }
-.zone-upload__texte { font-size: 0.86rem; font-weight: 600; color: var(--texte); }
-.zone-upload__precision { font-size: 0.76rem; color: var(--texte-faible); }
-
-#import-statut:empty { display: none; }
-#import-statut { margin-bottom: 1.2em; }
-
-.alerte-bloc {
-  border-radius: var(--rayon);
-  padding: 1em 1.3em;
-  font-size: 0.86rem;
-  display: flex;
-  align-items: flex-start;
-  gap: 0.8em;
-}
-.alerte-bloc strong { display: block; margin-bottom: 0.15em; }
-.alerte-bloc p { margin: 0; color: var(--texte-att); }
-.alerte-bloc.erreur { background: var(--rouge-fond); color: var(--rouge); }
-.alerte-bloc.erreur p { color: #b23a3e; }
-.alerte-bloc.succes { background: var(--vert-fond); color: var(--vert); }
-.alerte-bloc.succes p { color: #0c7a46; }
-
-.nav-item--danger { color: var(--texte-att); }
-
-/* ---------- Toast ---------- */
-
-.toast {
-  position: fixed;
-  bottom: 1.6em;
-  left: 50%;
-  transform: translateX(-50%) translateY(120%);
-  background: var(--texte);
-  color: #fff;
-  padding: 0.85em 1.4em;
-  border-radius: var(--rayon-s);
-  font-size: 0.86rem;
-  font-weight: 500;
-  box-shadow: var(--ombre-hover);
-  z-index: 100;
-  transition: transform 0.25s cubic-bezier(.2,.8,.3,1);
-  display: flex;
-  align-items: center;
-  gap: 0.6em;
-}
-.toast.visible { transform: translateX(-50%) translateY(0); }
-.toast strong { font-weight: 700; }
-
-/* ---------- Accessibilité ---------- */
-
-@media (prefers-reduced-motion: reduce) {
-  * { transition: none !important; animation: none !important; }
-}
-
-/* ---------- Responsive ---------- */
-
-@media (max-width: 880px) {
-  .shell { flex-direction: column; }
-  .sidebar { width: 100%; height: auto; position: relative; flex-direction: row; align-items: center; overflow-x: auto; }
-  .sidebar__brand { padding: 0.4em 1em 0.4em 0.2em; }
-  .sidebar__nav { flex-direction: row; flex: none; }
-  .nav-item { white-space: nowrap; }
-  .sidebar__bas { border-top: none; border-left: 1px solid var(--bordure); padding-top: 0; padding-left: 0.6em; margin-left: 0.4em; }
-  .topbar { flex-direction: column; align-items: flex-start; gap: 0.8em; padding: 1em 1.2em; }
-  .topbar__droite { width: 100%; justify-content: space-between; }
-  .contenu { padding: 1.2em; }
-}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<script src="js/storage.js"></script>
+<script src="js/csvParser.js"></script>
+<script src="js/charts.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
