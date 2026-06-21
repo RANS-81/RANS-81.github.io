@@ -191,11 +191,60 @@
   .modal-footer{ position:sticky; bottom:0; background:var(--bg); padding-top:10px; display:flex; gap:8px; }
   .modal-footer button{ flex:1; }
   .import-summary{ display:flex; justify-content:space-between; font-size:13px; color:var(--text-secondary); margin-bottom:10px; padding:0 2px; }
+
+  /* Navigation par onglets */
+  .tabbar{
+    position:sticky; top:0; z-index:30; display:flex; gap:4px; background:var(--bg);
+    padding:calc(env(safe-area-inset-top) + 10px) 0 10px; margin-bottom:8px;
+  }
+  .tab-btn{
+    flex:1; padding:9px 4px; border-radius:var(--radius-md); border:0.5px solid var(--border);
+    background:var(--card); color:var(--text-secondary); font-weight:600; font-size:13px;
+  }
+  .tab-btn.active{ background:var(--accent-bg); color:var(--accent); border-color:var(--accent); }
+  .tab-panel{ display:none; }
+  .tab-panel.active{ display:block; }
+
+  /* Graphique barres empilées */
+  .chart-wrap{ overflow-x:auto; -webkit-overflow-scrolling:touch; }
+  .chart-svg{ display:block; }
+  .chart-legend{ display:flex; flex-wrap:wrap; gap:8px 12px; margin-top:12px; }
+  .legend-item{ display:flex; align-items:center; gap:6px; font-size:12px; color:var(--text-secondary); }
+  .legend-swatch{ width:10px; height:10px; border-radius:3px; flex-shrink:0; }
+  .month-select-row{ display:flex; gap:8px; margin-bottom:12px; }
+  .month-select-row select{ flex:1; }
+
+  /* Assistant chat */
+  .api-key-row{ display:flex; gap:8px; margin-bottom:6px; }
+  .api-key-row input{ flex:1; }
+  .api-key-row button{ width:auto; flex-shrink:0; padding:10px 14px; }
+  .key-status{ font-size:12px; margin:0 0 4px; display:flex; align-items:center; gap:6px; }
+  .key-status.ok{ color:#3B6D11; }
+  @media (prefers-color-scheme: dark){ .key-status.ok{ color:#C0DD97; } }
+  .chat-log{ display:flex; flex-direction:column; gap:10px; margin-bottom:12px; max-height:50vh; overflow-y:auto; }
+  .chat-msg{ font-size:14px; line-height:1.45; padding:10px 12px; border-radius:var(--radius-md); max-width:88%; white-space:pre-wrap; }
+  .chat-msg.user{ background:var(--accent-bg); color:var(--accent); align-self:flex-end; }
+  .chat-msg.assistant{ background:var(--card); border:0.5px solid var(--border); align-self:flex-start; }
+  .chat-msg.error{ background:#FCEBEB; color:#A32D2D; align-self:flex-start; }
+  @media (prefers-color-scheme: dark){ .chat-msg.error{ background:#791F1F; color:#F09595; } }
+  .chat-input-row{ display:flex; gap:8px; }
+  .chat-input-row input{ flex:1; }
+  .chat-input-row button{ width:auto; flex-shrink:0; padding:10px 16px; }
+  .suggestions{ display:flex; flex-wrap:wrap; gap:6px; margin-bottom:12px; }
+  .suggestion-chip{ width:auto; font-size:12px; padding:6px 10px; background:var(--card); border:0.5px solid var(--border); color:var(--text-secondary); }
 </style>
 </head>
 <body>
 
 <h1>Budget du foyer</h1>
+
+<div class="tabbar">
+  <button class="tab-btn" id="tab-btn-home">Accueil</button>
+  <button class="tab-btn" id="tab-btn-stats">Statistiques</button>
+  <button class="tab-btn" id="tab-btn-chat">Assistant</button>
+</div>
+
+<div class="tab-panel" id="tab-home">
 
 <div class="stats">
   <div class="stat">
@@ -296,6 +345,50 @@
   <div id="history"></div>
   <p class="empty" id="empty-msg" style="display:none;">Aucun mouvement pour le moment</p>
 </div>
+
+</div><!-- /tab-home -->
+
+<div class="tab-panel" id="tab-stats">
+  <div class="card">
+    <p class="card-title">📊 Évolution des dépenses par mois</p>
+    <div class="month-select-row">
+      <select id="stats-range">
+        <option value="6">6 derniers mois</option>
+        <option value="12" selected>12 derniers mois</option>
+        <option value="all">Tout l'historique</option>
+      </select>
+    </div>
+    <div class="chart-wrap">
+      <svg id="stats-chart" class="chart-svg"></svg>
+    </div>
+    <div class="chart-legend" id="stats-legend"></div>
+    <p class="empty" id="stats-empty" style="display:none;">Pas encore assez de données pour afficher un graphique</p>
+  </div>
+</div><!-- /tab-stats -->
+
+<div class="tab-panel" id="tab-chat">
+  <div class="card">
+    <p class="card-title">🤖 Assistant — questions sur tes dépenses</p>
+    <p class="key-status" id="key-status">Aucune clé API enregistrée sur cet appareil</p>
+    <div class="api-key-row">
+      <input type="password" id="api-key-input" placeholder="Clé API Anthropic (sk-ant-...)">
+      <button class="secondary" id="api-key-save">Enregistrer</button>
+    </div>
+    <p class="hint" style="margin-bottom:14px;">Ta clé est stockée uniquement sur cet appareil (jamais envoyée à GitHub ni à personne d'autre que l'API Anthropic). <a href="https://console.anthropic.com/settings/keys" target="_blank" style="color:var(--accent);">Créer une clé</a></p>
+
+    <div class="suggestions" id="chat-suggestions">
+      <button class="suggestion-chip" data-q="Quelle catégorie a le plus augmenté ce mois-ci par rapport au mois dernier ?">Catégorie en hausse</button>
+      <button class="suggestion-chip" data-q="Quel est mon solde moyen sur les 3 derniers mois ?">Solde moyen 3 mois</button>
+      <button class="suggestion-chip" data-q="Sur quelle catégorie pourrais-je économiser ?">Où économiser ?</button>
+    </div>
+
+    <div class="chat-log" id="chat-log"></div>
+    <div class="chat-input-row">
+      <input type="text" id="chat-input" placeholder="Pose une question sur tes dépenses...">
+      <button class="primary" id="chat-send">Envoyer</button>
+    </div>
+  </div>
+</div><!-- /tab-chat -->
 
 <div id="import-modal-root"></div>
 
@@ -812,6 +905,265 @@
     };
     reader.readAsText(file, 'UTF-8');
   });
+
+  // ---------- Navigation par onglets ----------
+  var tabBtns = {
+    home: document.getElementById('tab-btn-home'),
+    stats: document.getElementById('tab-btn-stats'),
+    chat: document.getElementById('tab-btn-chat')
+  };
+  var tabPanels = {
+    home: document.getElementById('tab-home'),
+    stats: document.getElementById('tab-stats'),
+    chat: document.getElementById('tab-chat')
+  };
+  function showTab(name){
+    Object.keys(tabBtns).forEach(function(k){
+      tabBtns[k].classList.toggle('active', k === name);
+      tabPanels[k].classList.toggle('active', k === name);
+    });
+    window.scrollTo(0,0);
+    if (name === 'stats') renderChart();
+  }
+  tabBtns.home.addEventListener('click', function(){ showTab('home'); });
+  tabBtns.stats.addEventListener('click', function(){ showTab('stats'); });
+  tabBtns.chat.addEventListener('click', function(){ showTab('chat'); });
+
+  // ---------- Graphique d'évolution mensuelle (barres empilées SVG) ----------
+  var EXPENSE_COLORS = {
+    Alimentation:'#3B6D11', Vacances:'#993556', Credit:'#534AB7', Transports:'#854F0B',
+    Vetements:'#993C1D', Scolarite:'#0F6E56', Restaurant:'#633806', Loisirs:'#72243E',
+    Maison:'#185FA5', Impots:'#444441', Energie:'#412402', Assurances:'#0C447C',
+    Sante:'#A32D2D', Abonnements:'#3C3489', Frais_bancaires:'#791F1F', Fournitures_scolaires:'#0F6E56'
+  };
+  var statsRangeEl = document.getElementById('stats-range');
+  var statsChartEl = document.getElementById('stats-chart');
+  var statsLegendEl = document.getElementById('stats-legend');
+  var statsEmptyEl = document.getElementById('stats-empty');
+
+  function monthLabel(key){
+    var parts = key.split('-');
+    var months = ['janv','févr','mars','avr','mai','juin','juil','août','sept','oct','nov','déc'];
+    return months[parseInt(parts[1],10)-1] + ' ' + parts[0].slice(2);
+  }
+
+  function renderChart(){
+    var expenseEntries = entries.filter(function(e){ return e.type === 'expense'; });
+    if (expenseEntries.length === 0){
+      statsChartEl.innerHTML = '';
+      statsLegendEl.innerHTML = '';
+      statsEmptyEl.style.display = 'block';
+      return;
+    }
+    statsEmptyEl.style.display = 'none';
+
+    // Regrouper par mois -> par catégorie
+    var byMonth = {};
+    expenseEntries.forEach(function(e){
+      var d = new Date(e.date);
+      var key = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0');
+      if (!byMonth[key]) byMonth[key] = {};
+      byMonth[key][e.category] = (byMonth[key][e.category] || 0) + e.amount;
+    });
+
+    var allMonths = Object.keys(byMonth).sort();
+    var range = statsRangeEl.value;
+    var months = range === 'all' ? allMonths : allMonths.slice(-parseInt(range,10));
+    if (months.length === 0){
+      statsChartEl.innerHTML = '';
+      statsEmptyEl.style.display = 'block';
+      return;
+    }
+
+    var usedCategories = {};
+    months.forEach(function(m){
+      Object.keys(byMonth[m]).forEach(function(c){ usedCategories[c] = true; });
+    });
+    var catOrder = EXPENSE_CATEGORIES.filter(function(c){ return usedCategories[c]; });
+
+    var monthTotals = months.map(function(m){
+      return Object.keys(byMonth[m]).reduce(function(s,c){ return s + byMonth[m][c]; }, 0);
+    });
+    var maxTotal = Math.max.apply(null, monthTotals.concat([1]));
+
+    // Dimensions SVG
+    var barW = 34, gap = 18;
+    var chartH = 220, axisH = 26, topPad = 10;
+    var chartW = months.length * (barW + gap) + gap;
+    var svgW = Math.max(chartW, 320);
+
+    var bars = months.map(function(m, i){
+      var x = gap + i * (barW + gap);
+      var yCursor = topPad + chartH;
+      var segs = '';
+      catOrder.forEach(function(cat){
+        var val = byMonth[m][cat] || 0;
+        if (val <= 0) return;
+        var h = (val / maxTotal) * chartH;
+        var y = yCursor - h;
+        segs += '<rect x="'+x+'" y="'+y.toFixed(1)+'" width="'+barW+'" height="'+h.toFixed(1)+'" fill="'+(EXPENSE_COLORS[cat]||'#999')+'" rx="2"><title>'+CATEGORY_LABELS[cat]+': '+fmt(val)+'</title></rect>';
+        yCursor = y;
+      });
+      var total = monthTotals[i];
+      var labelY = topPad + chartH - (total/maxTotal)*chartH - 6;
+      if (labelY < 12) labelY = 12;
+      segs += '<text x="'+(x+barW/2)+'" y="'+labelY.toFixed(1)+'" text-anchor="middle" font-size="10" fill="var(--text-secondary)">'+Math.round(total)+'€</text>';
+      segs += '<text x="'+(x+barW/2)+'" y="'+(topPad+chartH+18)+'" text-anchor="middle" font-size="10" fill="var(--text-secondary)">'+monthLabel(m)+'</text>';
+      return segs;
+    }).join('');
+
+    statsChartEl.setAttribute('viewBox', '0 0 ' + svgW + ' ' + (topPad+chartH+axisH));
+    statsChartEl.setAttribute('width', svgW);
+    statsChartEl.setAttribute('height', topPad+chartH+axisH);
+    statsChartEl.innerHTML =
+      '<line x1="0" y1="'+(topPad+chartH)+'" x2="'+svgW+'" y2="'+(topPad+chartH)+'" stroke="var(--border)" stroke-width="1"/>' +
+      bars;
+
+    statsLegendEl.innerHTML = catOrder.map(function(cat){
+      return '<div class="legend-item"><span class="legend-swatch" style="background:'+(EXPENSE_COLORS[cat]||'#999')+';"></span>'+CATEGORY_LABELS[cat]+'</div>';
+    }).join('');
+  }
+  statsRangeEl.addEventListener('change', renderChart);
+
+  // ---------- Assistant chat (API Anthropic, clé stockée localement) ----------
+  var API_KEY_STORAGE = 'foyer_anthropic_key_v1';
+  var apiKeyInput = document.getElementById('api-key-input');
+  var apiKeySaveBtn = document.getElementById('api-key-save');
+  var keyStatusEl = document.getElementById('key-status');
+  var chatLogEl = document.getElementById('chat-log');
+  var chatInputEl = document.getElementById('chat-input');
+  var chatSendBtn = document.getElementById('chat-send');
+  var chatSuggestionsEl = document.getElementById('chat-suggestions');
+
+  function getStoredKey(){
+    try { return localStorage.getItem(API_KEY_STORAGE) || ''; } catch(e){ return ''; }
+  }
+  function setStoredKey(k){
+    try {
+      if (k) localStorage.setItem(API_KEY_STORAGE, k);
+      else localStorage.removeItem(API_KEY_STORAGE);
+    } catch(e){}
+  }
+  function refreshKeyStatus(){
+    var k = getStoredKey();
+    if (k) {
+      keyStatusEl.textContent = '✓ Clé enregistrée sur cet appareil';
+      keyStatusEl.classList.add('ok');
+      apiKeyInput.placeholder = '•••••••••••••••• (clé enregistrée)';
+    } else {
+      keyStatusEl.textContent = 'Aucune clé API enregistrée sur cet appareil';
+      keyStatusEl.classList.remove('ok');
+      apiKeyInput.placeholder = 'Clé API Anthropic (sk-ant-...)';
+    }
+  }
+  apiKeySaveBtn.addEventListener('click', function(){
+    var val = apiKeyInput.value.trim();
+    if (val) {
+      setStoredKey(val);
+      apiKeyInput.value = '';
+      refreshKeyStatus();
+    } else {
+      setStoredKey('');
+      refreshKeyStatus();
+    }
+  });
+
+  function addChatMessage(role, text){
+    var div = document.createElement('div');
+    div.className = 'chat-msg ' + role;
+    div.textContent = text;
+    chatLogEl.appendChild(div);
+    chatLogEl.scrollTop = chatLogEl.scrollHeight;
+    return div;
+  }
+
+  function buildFinancialSummary(){
+    // On envoie un résumé agrégé (pas chaque ligne) pour limiter la taille et le coût
+    var byMonth = {};
+    entries.forEach(function(e){
+      var d = new Date(e.date);
+      var key = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0');
+      if (!byMonth[key]) byMonth[key] = { expense: 0, income: 0, byCat: {} };
+      if (e.type === 'income') {
+        byMonth[key].income += e.amount;
+      } else {
+        byMonth[key].expense += e.amount;
+        byMonth[key].byCat[e.category] = (byMonth[key].byCat[e.category]||0) + e.amount;
+      }
+    });
+    var months = Object.keys(byMonth).sort();
+    var lines = months.map(function(m){
+      var d = byMonth[m];
+      var catStr = Object.keys(d.byCat).map(function(c){ return CATEGORY_LABELS[c]+': '+d.byCat[c].toFixed(2)+'€'; }).join(', ');
+      return m + ' — Revenus: ' + d.income.toFixed(2) + '€, Dépenses: ' + d.expense.toFixed(2) + '€ (' + catStr + ')';
+    });
+    return lines.join('\n');
+  }
+
+  function sendChatMessage(question){
+    var key = getStoredKey();
+    if (!key) {
+      addChatMessage('error', "Ajoute d'abord ta clé API Anthropic ci-dessus pour utiliser l'assistant.");
+      return;
+    }
+    if (!question || !question.trim()) return;
+
+    addChatMessage('user', question);
+    var thinkingMsg = addChatMessage('assistant', '...');
+    chatInputEl.value = '';
+    chatSendBtn.disabled = true;
+
+    var summary = buildFinancialSummary();
+    var systemPrompt = "Tu es un assistant budget familial. Voici un résumé mensuel des revenus et dépenses du foyer, par catégorie (en euros):\n\n" + summary + "\n\nRéponds de façon concise (3-5 phrases maximum), concrète, en te basant uniquement sur ces données. Si une information manque pour répondre, dis-le clairement.";
+
+    fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': key,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true'
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-6',
+        max_tokens: 500,
+        system: systemPrompt,
+        messages: [{ role: 'user', content: question }]
+      })
+    })
+    .then(function(res){
+      if (!res.ok) {
+        return res.text().then(function(t){ throw new Error('HTTP ' + res.status + ': ' + t.slice(0,200)); });
+      }
+      return res.json();
+    })
+    .then(function(data){
+      var text = (data.content || []).filter(function(b){ return b.type === 'text'; }).map(function(b){ return b.text; }).join('\n');
+      thinkingMsg.textContent = text || '(réponse vide)';
+    })
+    .catch(function(err){
+      thinkingMsg.className = 'chat-msg error';
+      if (String(err.message).indexOf('401') !== -1) {
+        thinkingMsg.textContent = "Clé API invalide ou expirée. Vérifie-la dans le champ ci-dessus.";
+      } else {
+        thinkingMsg.textContent = "Erreur lors de l'appel à l'API : " + err.message;
+      }
+    })
+    .finally(function(){
+      chatSendBtn.disabled = false;
+    });
+  }
+
+  chatSendBtn.addEventListener('click', function(){ sendChatMessage(chatInputEl.value); });
+  chatInputEl.addEventListener('keydown', function(e){
+    if (e.key === 'Enter') sendChatMessage(chatInputEl.value);
+  });
+  Array.prototype.forEach.call(chatSuggestionsEl.querySelectorAll('.suggestion-chip'), function(btn){
+    btn.addEventListener('click', function(){ sendChatMessage(btn.getAttribute('data-q')); });
+  });
+
+  refreshKeyStatus();
+  showTab('home');
 
   setType('expense');
   render();
