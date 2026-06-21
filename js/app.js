@@ -11,6 +11,7 @@ const App = {
   TITRES_PANEL: {
     dashboard: 'Tableau de bord',
     croise: 'Vue mensuelle',
+    analyses: 'Analyses',
     virements: 'Virements',
     noncat: 'À catégoriser',
     import: 'Importer un relevé',
@@ -67,6 +68,7 @@ const App = {
     this.renderImportHistorique();
     this.renderDashboard();
     this.renderTableauCroise();
+    this.renderAnalyses();
     this.renderVirements();
     this.renderNonCategorisees();
     this.renderBadges();
@@ -144,7 +146,7 @@ const App = {
 
       zoneStatut.innerHTML = `<div class="alerte-bloc succes"><strong>Import réussi — ${this.labelPersonne(personne)}</strong><p>${message}</p></div>`;
 
-      
+      this.renderAll();
       this.toast(`${ajoutees} transaction(s) importée(s) pour ${this.labelPersonne(personne).toLowerCase()}`);
 
       // Bascule automatique vers le tableau de bord pour voir le résultat immédiatement
@@ -152,11 +154,7 @@ const App = {
 
     } catch (e) {
       zoneStatut.innerHTML = `<div class="alerte-bloc erreur"><strong>Erreur de lecture</strong><p>${this.escape(e.message)}</p></div>`;
-      return;
     }
-        // Rendu séparé du try-catch
-    this.renderAll();
-    setTimeout(() => this.allerVersPanel('dashboard'), 700);
   },
 
   // ---------------------------------------------------------------------
@@ -202,6 +200,59 @@ const App = {
 
     ChartsModule.renderParMois('chart-par-mois', mois, categories, matrice);
     ChartsModule.renderParCategorie('chart-par-categorie', totauxCategorie);
+  },
+
+  // ---------------------------------------------------------------------
+  // Analyses — graphique linéaire par catégorie
+  // ---------------------------------------------------------------------
+
+  renderAnalyses() {
+    const txns = this.transactionsNormales().filter(t => t.sens === 'debit');
+    const aDesDonnees = txns.length > 0;
+    document.getElementById('analyses-vide').classList.toggle('cache', aDesDonnees);
+    document.getElementById('analyses-contenu').classList.toggle('cache', !aDesDonnees);
+    if (!aDesDonnees) return;
+
+    const mois = this.moisDisponibles(txns);
+    const categories = [...new Set(txns.map(t => t.categorie))].sort();
+
+    const matrice = {};
+    categories.forEach(c => matrice[c] = {});
+    txns.forEach(t => {
+      const m = t.date.slice(0, 7);
+      matrice[t.categorie][m] = (matrice[t.categorie][m] || 0) + t.montant;
+    });
+
+    ChartsModule.renderMiniLignes('analyses-graphiques', mois, categories, matrice);
+
+    // Tableau récapitulatif : total, moyenne, max par catégorie
+    const totaux = categories.map(cat => {
+      const vals = mois.map(m => matrice[cat][m] || 0);
+      const total = vals.reduce((s, v) => s + v, 0);
+      const moisActifs = vals.filter(v => v > 0).length;
+      const moyenne = moisActifs > 0 ? total / moisActifs : 0;
+      const max = Math.max(...vals);
+      return { cat, total, moyenne, max };
+    }).sort((a, b) => b.total - a.total);
+
+    const recap = document.getElementById('analyses-recap');
+    recap.innerHTML = `
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Catégorie</th><th class="mono al-droite">Total</th><th class="mono al-droite">Moy./mois actif</th><th class="mono al-droite">Mois max</th></tr></thead>
+          <tbody>
+            ${totaux.map(({ cat, total, moyenne, max }) => `
+              <tr>
+                <td><span class="dot" style="background:${ChartsModule.couleurPour(cat, 0)}"></span>${this.escape(cat)}</td>
+                <td class="mono al-droite neg">${this.formatMontant(total)}</td>
+                <td class="mono al-droite">${this.formatMontant(moyenne)}</td>
+                <td class="mono al-droite">${this.formatMontant(max)}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+    `;
   },
 
   // ---------------------------------------------------------------------
@@ -332,6 +383,7 @@ const App = {
 
     document.getElementById('btn-importer-topbar').addEventListener('click', () => this.allerVersPanel('import'));
     document.getElementById('btn-importer-vide').addEventListener('click', () => this.allerVersPanel('import'));
+    document.getElementById('btn-importer-analyses').addEventListener('click', () => this.allerVersPanel('import'));
 
     document.querySelectorAll('#filtre-personne .segmente__item').forEach(btn => {
       btn.addEventListener('click', () => {
