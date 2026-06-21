@@ -304,6 +304,42 @@ const App = {
     html += '</tbody></table></div>';
 
     el.innerHTML = html;
+
+    // Afficher le bouton d'export
+    document.getElementById('btn-export-croise').classList.remove('cache');
+
+    // Stocker les données pour l'export (remplacées à chaque render)
+    this._croiseData = { mois, categories, matrice, totalParMois, totalGeneral };
+  },
+
+  exportCroiseCSV() {
+    const { mois, categories, matrice, totalParMois, totalGeneral } = this._croiseData || {};
+    if (!mois) return;
+
+    const sep = ';';
+    const num = v => v.toFixed(2).replace('.', ','); // format décimal français
+    const lignes = [];
+
+    // En-tête
+    lignes.push(['Catégorie', ...mois.map(m => ChartsModule.libelleMoisCourt(m)), 'Total'].join(sep));
+
+    // Lignes catégories
+    categories.forEach(cat => {
+      const totalLigne = mois.reduce((s, m) => s + (matrice[cat][m] || 0), 0);
+      lignes.push([cat, ...mois.map(m => num(matrice[cat][m] || 0)), num(totalLigne)].join(sep));
+    });
+
+    // Ligne totaux
+    lignes.push(['Total', ...mois.map(m => num(totalParMois[m])), num(totalGeneral)].join(sep));
+
+    const bom = '﻿'; // BOM UTF-8 pour Excel
+    const blob = new Blob([bom + lignes.join('\r\n')], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `pulse-vue-mensuelle-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
   },
 
   // ---------------------------------------------------------------------
@@ -384,6 +420,7 @@ const App = {
     document.getElementById('btn-importer-topbar').addEventListener('click', () => this.allerVersPanel('import'));
     document.getElementById('btn-importer-vide').addEventListener('click', () => this.allerVersPanel('import'));
     document.getElementById('btn-importer-analyses').addEventListener('click', () => this.allerVersPanel('import'));
+    document.getElementById('btn-export-croise').addEventListener('click', () => this.exportCroiseCSV());
 
     document.querySelectorAll('#filtre-personne .segmente__item').forEach(btn => {
       btn.addEventListener('click', () => {
