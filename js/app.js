@@ -527,4 +527,20 @@ const App = {
   },
 };
 
-document.addEventListener('DOMContentLoaded', () => App.init());
+document.addEventListener('DOMContentLoaded', () => {
+  try {
+    App.init();
+  } catch(e) {
+    document.body.insertAdjacentHTML('afterbegin',
+      `<div style="background:#fde;border:2px solid #c00;padding:1rem 1.5rem;font-family:monospace;font-size:13px;position:fixed;top:0;left:0;right:0;z-index:9999">
+        <b>Erreur JS :</b> ${e.message}<br><small>${e.stack?.split('\n')[1] || ''}</small>
+      </div>`);
+  }
+});
+
+window.addEventListener('error', (e) => {
+  document.body.insertAdjacentHTML('afterbegin',
+    `<div style="background:#fde;border:2px solid #c00;padding:1rem 1.5rem;font-family:monospace;font-size:13px;position:fixed;top:0;left:0;right:0;z-index:9999">
+      <b>Erreur :</b> ${e.message} — ${e.filename?.split('/').pop()}:${e.lineno}
+    </div>`);
+});
