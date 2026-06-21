@@ -144,7 +144,7 @@ const App = {
 
       zoneStatut.innerHTML = `<div class="alerte-bloc succes"><strong>Import réussi — ${this.labelPersonne(personne)}</strong><p>${message}</p></div>`;
 
-      this.renderAll();
+      
       this.toast(`${ajoutees} transaction(s) importée(s) pour ${this.labelPersonne(personne).toLowerCase()}`);
 
       // Bascule automatique vers le tableau de bord pour voir le résultat immédiatement
@@ -152,7 +152,11 @@ const App = {
 
     } catch (e) {
       zoneStatut.innerHTML = `<div class="alerte-bloc erreur"><strong>Erreur de lecture</strong><p>${this.escape(e.message)}</p></div>`;
+      return;
     }
+        // Rendu séparé du try-catch
+    this.renderAll();
+    setTimeout(() => this.allerVersPanel('dashboard'), 700);
   },
 
   // ---------------------------------------------------------------------
