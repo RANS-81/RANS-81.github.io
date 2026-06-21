@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Registre — Suivi de budget</title>
+<meta name="description" content="Suivi de budget à partir des relevés bancaires CSV : tableau de bord par catégorie, vue croisée mensuelle, virements et transactions non catégorisées.">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Source+Sans+3:wght@400;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<header class="entete">
+  <div class="entete__inner">
+    <h1>Registre <span class="ledger-no">budget du foyer</span></h1>
+    <div class="entete__droite">
+      <select id="filtre-personne" aria-label="Filtrer par personne">
+        <option value="tous">Monsieur &amp; Madame</option>
+        <option value="monsieur">Monsieur</option>
+        <option value="madame">Madame</option>
+      </select>
+    </div>
+  </div>
+  <nav class="tabs-principal" role="tablist">
+    <button class="tab-principal active" data-panel="import" role="tab">Import</button>
+    <button class="tab-principal" data-panel="dashboard" role="tab">Tableau de bord</button>
+    <button class="tab-principal" data-panel="croise" role="tab">Vue mensuelle</button>
+    <button class="tab-principal" data-panel="virements" role="tab">Virements <span class="badge cache" id="badge-virements">0</span></button>
+    <button class="tab-principal" data-panel="noncat" role="tab">Non catégorisées <span class="badge cache" id="badge-noncat">0</span></button>
+  </nav>
+</header>
+
+<main class="conteneur">
+
+  <!-- ============ Onglet 1 : Import ============ -->
+  <section class="panel-principal active" id="panel-import">
+    <div class="section">
+      <h2>Importer un relevé</h2>
+      <p class="intro">Fichier CSV exporté depuis l'espace bancaire (séparateur « ; »). Un import par personne, pour garder la trace de qui a dépensé quoi.</p>
+
+      <div class="import-grid">
+        <div class="import-carte import-carte--monsieur">
+          <h3>Monsieur</h3>
+          <p>Relevé du compte de Monsieur.</p>
+          <div class="zone-upload">
+            <label class="btn-fichier" for="input-csv-monsieur">Choisir un fichier CSV</label>
+            <input type="file" id="input-csv-monsieur" accept=".csv,text/csv">
+            <span class="precision">Format banque (Caisse d'Épargne / BPCE et compatibles)</span>
+          </div>
+        </div>
+        <div class="import-carte import-carte--madame">
+          <h3>Madame</h3>
+          <p>Relevé du compte de Madame.</p>
+          <div class="zone-upload">
+            <label class="btn-fichier" for="input-csv-madame">Choisir un fichier CSV</label>
+            <input type="file" id="input-csv-madame" accept=".csv,text/csv">
+            <span class="precision">Format banque (Caisse d'Épargne / BPCE et compatibles)</span>
+          </div>
+        </div>
+      </div>
+
+      <div id="import-apercu"></div>
+    </div>
+
+    <div class="section">
+      <h2>Historique des imports</h2>
+      <div id="import-historique"></div>
+    </div>
+
+    <div class="section">
+      <h2>Données</h2>
+      <div class="io-card danger">
+        <h3>Réinitialiser</h3>
+        <p>Supprime toutes les transactions importées. Irréversible.</p>
+        <button id="btn-reset">Tout effacer</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ Onglet 2 : Tableau de bord ============ -->
+  <section class="panel-principal" id="panel-dashboard">
+    <div id="dashboard-vide" class="section">
+      <p class="vide">Aucune donnée à afficher. Importe un relevé dans l'onglet « Import » pour commencer.</p>
+    </div>
+
+    <div id="dashboard-contenu" class="cache">
+      <section class="resume-grid" aria-label="Résumé">
+        <div class="resume-cell">
+          <span class="resume-cell__label">Revenus</span>
+          <span class="resume-cell__valeur pos mono" id="dash-revenus">0,00 €</span>
+        </div>
+        <div class="resume-cell">
+          <span class="resume-cell__label">Dépenses</span>
+          <span class="resume-cell__valeur neg mono" id="dash-depenses">0,00 €</span>
+        </div>
+        <div class="resume-cell">
+          <span class="resume-cell__label">Net</span>
+          <span class="resume-cell__valeur mono" id="dash-net">0,00 €</span>
+        </div>
+        <div class="resume-cell">
+          <span class="resume-cell__label">Mois couverts</span>
+          <span class="resume-cell__valeur mono" id="dash-nb-mois">0</span>
+        </div>
+      </section>
+
+      <div class="deux-colonnes">
+        <section class="section">
+          <h2>Dépenses par mois et catégorie</h2>
+          <div class="chart-card"><canvas id="chart-par-mois"></canvas></div>
+        </section>
+        <section class="section">
+          <h2>Cumulé par catégorie</h2>
+          <div class="chart-card"><canvas id="chart-par-categorie"></canvas></div>
+        </section>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ Onglet 3 : Vue mensuelle (tableau croisé) ============ -->
+  <section class="panel-principal" id="panel-croise">
+    <div class="section">
+      <h2>Catégories × mois</h2>
+      <p class="intro">Total des dépenses par catégorie pour chaque mois disponible.</p>
+      <div id="tableau-croise"></div>
+    </div>
+  </section>
+
+  <!-- ============ Onglet 4 : Virements ============ -->
+  <section class="panel-principal" id="panel-virements">
+    <div class="section">
+      <h2>Virements internes</h2>
+      <p class="intro">Mouvements entre comptes du foyer, exclus des statistiques de dépenses.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Date</th><th>Libellé</th><th>Personne</th><th>Détail</th><th style="text-align:right">Montant</th></tr></thead>
+          <tbody id="virements-corps"></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ Onglet 5 : Non catégorisées ============ -->
+  <section class="panel-principal" id="panel-noncat">
+    <div class="section">
+      <h2>Transactions non catégorisées</h2>
+      <p class="intro">Mouvements que la banque n'a pas su classer automatiquement. À corriger directement dans l'espace bancaire si besoin.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Date</th><th>Libellé</th><th>Personne</th><th>Détail</th><th style="text-align:right">Montant</th></tr></thead>
+          <tbody id="noncat-corps"></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<footer class="pied">
+  Données stockées localement dans votre navigateur · rien n'est envoyé sur un serveur.
+</footer>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
+<script src="js/storage.js"></script>
+<script src="js/csvParser.js"></script>
+<script src="js/charts.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
