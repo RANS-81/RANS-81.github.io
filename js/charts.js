@@ -33,6 +33,7 @@ const ChartsModule = {
    * @param matrice { categorie: { '2026-01': montant, ... } }
    */
   renderParMois(canvasId, labelsMois, categories, matrice, onClic) {
+    if (typeof Chart === 'undefined') return;
     const ctx = document.getElementById(canvasId);
     if (!ctx) return;
     this._charts[canvasId]?.destroy();
@@ -81,6 +82,7 @@ const ChartsModule = {
   },
 
   renderParCategorie(canvasId, totauxParCategorie, onClic) {
+    if (typeof Chart === 'undefined') return;
     const ctx = document.getElementById(canvasId);
     if (!ctx) return;
     this._charts[canvasId]?.destroy();
