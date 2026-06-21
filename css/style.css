@@ -1,515 +1,467 @@
-/* =========================================================================
-   Pulse — budget du foyer
-   Direction : fintech sobre. Fond gris-bleu très clair, cartes blanches
-   arrondies avec ombre douce, accent indigo, vert/rouge réservés aux
-   montants. Typographie Inter, une seule famille pour tout — display,
-   corps de texte et chiffres — avec des poids contrastés.
-   ========================================================================= */
+/**
+ * app.js
+ * Logique applicative : import CSV (alimente directement le tableau de bord),
+ * navigation par panneaux, calculs et rendu.
+ */
 
-:root {
-  --fond: #F6F7FB;
-  --carte: #FFFFFF;
-  --bordure: #E7E9F1;
-  --bordure-forte: #D7DAE6;
+const App = {
+  state: null,
+  filtrePersonne: 'tous', // 'tous' | 'monsieur' | 'madame'
 
-  --texte: #15182B;
-  --texte-att: #6B7088;
-  --texte-faible: #9499AD;
+  TITRES_PANEL: {
+    dashboard: 'Tableau de bord',
+    croise: 'Vue mensuelle',
+    analyses: 'Analyses',
+    virements: 'Virements',
+    noncat: 'À catégoriser',
+    import: 'Importer un relevé',
+  },
 
-  --accent: #5B5FEF;
-  --accent-fonce: #4144C4;
-  --accent-fond: #EEEEFD;
+  init() {
+    this.state = Store.load();
+    this.bindEvents();
+    this.renderAll();
+  },
 
-  --vert: #12A35E;
-  --vert-fond: #E9F9F1;
-  --rouge: #E5484D;
-  --rouge-fond: #FDEEEE;
+  // ---------------------------------------------------------------------
+  // Helpers
+  // ---------------------------------------------------------------------
 
-  --rayon-s: 8px;
-  --rayon: 12px;
-  --rayon-l: 16px;
-  --ombre: 0 1px 2px rgba(21, 24, 43, 0.04), 0 1px 1px rgba(21, 24, 43, 0.03);
-  --ombre-hover: 0 4px 16px rgba(21, 24, 43, 0.08);
+  formatMontant(v) {
+    return v.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €';
+  },
 
-  --font: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-}
+  formatDate(iso) {
+    const [y, m, d] = iso.split('-');
+    return `${d}/${m}/${y}`;
+  },
 
-* { box-sizing: border-box; }
+  escape(s) {
+    const d = document.createElement('div');
+    d.textContent = s ?? '';
+    return d.innerHTML;
+  },
 
-html, body {
-  margin: 0;
-  padding: 0;
-  background: var(--fond);
-  color: var(--texte);
-  font-family: var(--font);
-  font-size: 14.5px;
-  line-height: 1.5;
-  -webkit-font-smoothing: antialiased;
-}
+  labelPersonne(p) {
+    return p === 'monsieur' ? 'Monsieur' : p === 'madame' ? 'Madame' : '—';
+  },
 
-::selection { background: var(--accent-fond); color: var(--accent-fonce); }
+  transactionsNormales() {
+    let txns = this.state.transactions.filter(t => t.statut === 'normale');
+    if (this.filtrePersonne !== 'tous') txns = txns.filter(t => t.personne === this.filtrePersonne);
+    return txns;
+  },
 
-.mono { font-variant-numeric: tabular-nums; font-feature-settings: 'tnum'; }
-.vide { color: var(--texte-att); padding: 1.2em 0; }
-.pos { color: var(--vert); }
-.neg { color: var(--rouge); }
-.cache { display: none !important; }
-.al-droite { text-align: right; }
+  toast(message, type = 'succes') {
+    const el = document.getElementById('toast');
+    el.textContent = message;
+    el.classList.add('visible');
+    clearTimeout(this._toastTimer);
+    this._toastTimer = setTimeout(() => el.classList.remove('visible'), 3200);
+  },
 
-.sr-only {
-  position: absolute; width: 1px; height: 1px;
-  padding: 0; margin: -1px; overflow: hidden;
-  clip: rect(0,0,0,0); white-space: nowrap; border: 0;
-}
+  // ---------------------------------------------------------------------
+  // Rendu général
+  // ---------------------------------------------------------------------
 
-.dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 0.55em; flex-shrink: 0; }
+  renderAll() {
+    this.renderImportHistorique();
+    this.renderDashboard();
+    this.renderTableauCroise();
+    this.renderAnalyses();
+    this.renderVirements();
+    this.renderNonCategorisees();
+    this.renderBadges();
+  },
 
-button { font-family: inherit; }
-:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  renderBadges() {
+    const nbVir = this.state.transactions.filter(t => t.statut === 'virement_interne').length;
+    const nbNc = this.state.transactions.filter(t => t.statut === 'non_categorisee').length;
+    document.getElementById('badge-virements').textContent = nbVir;
+    document.getElementById('badge-virements').classList.toggle('cache', nbVir === 0);
+    document.getElementById('badge-noncat').textContent = nbNc;
+    document.getElementById('badge-noncat').classList.toggle('cache', nbNc === 0);
+  },
 
-/* ---------- Layout général ---------- */
+  // ---------------------------------------------------------------------
+  // Import — directement intégré, pas d'étape de confirmation séparée
+  // ---------------------------------------------------------------------
 
-.shell {
-  display: flex;
-  min-height: 100vh;
-}
+  renderImportHistorique() {
+    const el = document.getElementById('import-historique');
+    const imports = [...this.state.imports].sort((a, b) => b.date - a.date);
+    if (imports.length === 0) {
+      el.innerHTML = '<p class="vide">Aucun import effectué pour le moment.</p>';
+      return;
+    }
+    el.innerHTML = `
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Fichier</th><th>Personne</th><th>Lignes</th><th>Ajoutées</th><th>Doublons ignorés</th><th>Date d'import</th></tr></thead>
+          <tbody>
+            ${imports.map(imp => `
+              <tr>
+                <td class="mono">${this.escape(imp.nomFichier)}</td>
+                <td>${this.labelPersonne(imp.personne)}</td>
+                <td class="mono">${imp.nbLignes}</td>
+                <td class="mono pos">${imp.nbAjoutees}</td>
+                <td class="mono">${imp.nbDoublons}</td>
+                <td class="mono">${new Date(imp.date).toLocaleString('fr-FR')}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+    `;
+  },
 
-/* ---------- Sidebar ---------- */
+  async onFichierChoisi(file, personne) {
+    const zoneStatut = document.getElementById('import-statut');
+    zoneStatut.innerHTML = `<div class="alerte-bloc succes"><strong>Lecture du fichier…</strong><p>${this.escape(file.name)}</p></div>`;
 
-.sidebar {
-  width: 232px;
-  flex-shrink: 0;
-  background: var(--carte);
-  border-right: 1px solid var(--bordure);
-  display: flex;
-  flex-direction: column;
-  padding: 1.4em 1em;
-  position: sticky;
-  top: 0;
-  height: 100vh;
-}
+    try {
+      const resultat = await CsvParser.parseFichier(file);
 
-.sidebar__brand {
-  display: flex;
-  align-items: center;
-  gap: 0.65em;
-  padding: 0.4em 0.6em 1.6em;
-}
-.sidebar__mark {
-  width: 30px; height: 30px;
-  border-radius: 9px;
-  background: linear-gradient(135deg, var(--accent), #8B8EF5);
-  color: #fff;
-  display: flex; align-items: center; justify-content: center;
-  font-weight: 800;
-  font-size: 0.95rem;
-}
-.sidebar__nom {
-  font-weight: 800;
-  font-size: 1.05rem;
-  letter-spacing: -0.01em;
-}
+      if (resultat.colonnesManquantes.length > 0) {
+        zoneStatut.innerHTML = `
+          <div class="alerte-bloc erreur">
+            <strong>Format de fichier non reconnu</strong>
+            <p>Colonnes manquantes : ${resultat.colonnesManquantes.map(c => `<code>${this.escape(c)}</code>`).join(', ')}. Vérifie qu'il s'agit d'un export CSV bancaire avec séparateur « ; ».</p>
+          </div>`;
+        return;
+      }
 
-.sidebar__nav {
-  display: flex;
-  flex-direction: column;
-  gap: 0.2em;
-  flex: 1;
-}
+      if (resultat.transactions.length === 0) {
+        zoneStatut.innerHTML = `<div class="alerte-bloc erreur"><strong>Aucune transaction lisible</strong><p>Le fichier ne contient aucune ligne exploitable.</p></div>`;
+        return;
+      }
 
-.nav-item {
-  display: flex;
-  align-items: center;
-  gap: 0.7em;
-  background: none;
-  border: none;
-  border-radius: var(--rayon-s);
-  padding: 0.6em 0.7em;
-  font-size: 0.88rem;
-  font-weight: 500;
-  color: var(--texte-att);
-  cursor: pointer;
-  text-align: left;
-  width: 100%;
-  transition: background 0.12s ease, color 0.12s ease;
-}
-.nav-item svg { width: 18px; height: 18px; flex-shrink: 0; }
-.nav-item:hover { background: var(--fond); color: var(--texte); }
-.nav-item.active { background: var(--accent-fond); color: var(--accent-fonce); font-weight: 600; }
+      // Import direct : pas d'étape de confirmation manuelle, on alimente le tableau de bord tout de suite
+      const { ajoutees, doublons } = Store.importerTransactions(file.name, personne, resultat.transactions);
+      this.state = Store.getState();
 
-.nav-badge {
-  margin-left: auto;
-  background: var(--rouge);
-  color: #fff;
-  font-size: 0.68rem;
-  font-weight: 700;
-  padding: 0.1em 0.5em;
-  border-radius: 999px;
-  line-height: 1.5;
-}
-.nav-item.active .nav-badge { background: var(--accent); }
+      const message = doublons > 0
+        ? `${ajoutees} transaction(s) ajoutée(s) · ${doublons} doublon(s) déjà connus ignoré(s)`
+        : `${ajoutees} transaction(s) ajoutée(s) avec succès`;
 
-.sidebar__bas {
-  border-top: 1px solid var(--bordure);
-  padding-top: 0.6em;
-}
-.nav-item--danger:hover { background: var(--rouge-fond); color: var(--rouge); }
+      zoneStatut.innerHTML = `<div class="alerte-bloc succes"><strong>Import réussi — ${this.labelPersonne(personne)}</strong><p>${message}</p></div>`;
 
-/* ---------- Zone principale ---------- */
+      this.renderAll();
+      this.toast(`${ajoutees} transaction(s) importée(s) pour ${this.labelPersonne(personne).toLowerCase()}`);
 
-.main {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-}
+      // Bascule automatique vers le tableau de bord pour voir le résultat immédiatement
+      setTimeout(() => this.allerVersPanel('dashboard'), 700);
 
-.topbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 1.3em 2em;
-  border-bottom: 1px solid var(--bordure);
-  background: var(--carte);
-  position: sticky;
-  top: 0;
-  z-index: 10;
-}
-.topbar__titre {
-  font-size: 1.2rem;
-  font-weight: 700;
-  letter-spacing: -0.01em;
-}
-.topbar__droite {
-  display: flex;
-  align-items: center;
-  gap: 0.9em;
-}
+    } catch (e) {
+      zoneStatut.innerHTML = `<div class="alerte-bloc erreur"><strong>Erreur de lecture</strong><p>${this.escape(e.message)}</p></div>`;
+    }
+  },
 
-.segmente {
-  display: flex;
-  background: var(--fond);
-  border-radius: var(--rayon-s);
-  padding: 3px;
-  gap: 2px;
-}
-.segmente__item {
-  background: none;
-  border: none;
-  padding: 0.4em 0.85em;
-  font-size: 0.82rem;
-  font-weight: 600;
-  color: var(--texte-att);
-  border-radius: 6px;
-  cursor: pointer;
-}
-.segmente__item.active { background: var(--carte); color: var(--texte); box-shadow: var(--ombre); }
+  // ---------------------------------------------------------------------
+  // Tableau de bord
+  // ---------------------------------------------------------------------
 
-.btn-accent {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5em;
-  background: var(--accent);
-  color: #fff;
-  border: none;
-  border-radius: var(--rayon-s);
-  padding: 0.62em 1.1em;
-  font-size: 0.85rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background 0.12s ease, transform 0.08s ease;
-}
-.btn-accent svg { width: 16px; height: 16px; }
-.btn-accent:hover { background: var(--accent-fonce); }
-.btn-accent:active { transform: scale(0.98); }
+  moisDisponibles(txns) {
+    const set = new Set(txns.map(t => t.date.slice(0, 7)));
+    return [...set].sort();
+  },
 
-.contenu {
-  padding: 2em;
-  max-width: 1320px;
-  width: 100%;
-  margin: 0 auto;
-}
+  renderDashboard() {
+    const txns = this.transactionsNormales().filter(t => t.sens === 'debit');
 
-.panel-principal { display: none; }
-.panel-principal.active { display: block; animation: apparition 0.18s ease; }
+    const mois = this.moisDisponibles(txns);
+    const categories = [...new Set(txns.map(t => t.categorie))].sort();
 
-@keyframes apparition {
-  from { opacity: 0; transform: translateY(4px); }
-  to { opacity: 1; transform: translateY(0); }
-}
+    const matrice = {};
+    categories.forEach(c => matrice[c] = {});
+    txns.forEach(t => {
+      matrice[t.categorie][t.date.slice(0, 7)] = (matrice[t.categorie][t.date.slice(0, 7)] || 0) + t.montant;
+    });
 
-/* ---------- État vide ---------- */
+    const totauxCategorie = {};
+    categories.forEach(c => {
+      totauxCategorie[c] = Object.values(matrice[c]).reduce((s, v) => s + v, 0);
+    });
 
-.etat-vide {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  text-align: center;
-  padding: 5em 2em;
-  background: var(--carte);
-  border: 1px solid var(--bordure);
-  border-radius: var(--rayon-l);
-}
-.etat-vide__icone {
-  width: 72px; height: 72px;
-  border-radius: 50%;
-  background: var(--accent-fond);
-  color: var(--accent);
-  display: flex; align-items: center; justify-content: center;
-  margin-bottom: 1.2em;
-}
-.etat-vide__icone svg { width: 36px; height: 36px; }
-.etat-vide h2 { font-size: 1.15rem; margin: 0 0 0.4em; }
-.etat-vide p { color: var(--texte-att); margin: 0 0 1.6em; max-width: 360px; }
+    const totalDepenses = Object.values(totauxCategorie).reduce((s, v) => s + v, 0);
+    const revenus = this.transactionsNormales().filter(t => t.sens === 'credit').reduce((s, t) => s + t.montant, 0);
 
-/* ---------- KPI ---------- */
+    document.getElementById('dash-revenus').textContent = this.formatMontant(revenus);
+    document.getElementById('dash-depenses').textContent = this.formatMontant(totalDepenses);
+    const net = revenus - totalDepenses;
+    document.getElementById('dash-net').textContent = this.formatMontant(net);
+    document.getElementById('dash-nb-mois').textContent = mois.length;
 
-.kpi-grid {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 1em;
-  margin-bottom: 1.6em;
-}
-@media (max-width: 900px) { .kpi-grid { grid-template-columns: repeat(2, 1fr); } }
+    const aDesDonnees = this.state.transactions.length > 0;
+    document.getElementById('dashboard-vide').classList.toggle('cache', aDesDonnees);
+    document.getElementById('dashboard-contenu').classList.toggle('cache', !aDesDonnees);
 
-.kpi-carte {
-  background: var(--carte);
-  border: 1px solid var(--bordure);
-  border-radius: var(--rayon);
-  padding: 1.2em 1.3em;
-  box-shadow: var(--ombre);
-}
-.kpi-carte--accent { background: var(--accent); border-color: var(--accent); }
-.kpi-carte--accent .kpi-carte__label { color: rgba(255,255,255,0.75); }
-.kpi-carte--accent .kpi-carte__valeur { color: #fff; }
+    if (!aDesDonnees) return;
 
-.kpi-carte__label {
-  display: block;
-  font-size: 0.76rem;
-  font-weight: 600;
-  color: var(--texte-att);
-  margin-bottom: 0.5em;
-}
-.kpi-carte__valeur {
-  display: block;
-  font-size: 1.55rem;
-  font-weight: 800;
-  letter-spacing: -0.02em;
-  font-variant-numeric: tabular-nums;
-}
+    ChartsModule.renderParMois('chart-par-mois', mois, categories, matrice);
+    ChartsModule.renderParCategorie('chart-par-categorie', totauxCategorie);
+  },
 
-/* ---------- Cartes / graphiques ---------- */
+  // ---------------------------------------------------------------------
+  // Analyses — graphique linéaire par catégorie
+  // ---------------------------------------------------------------------
 
-.grille-graphiques {
-  display: grid;
-  grid-template-columns: 1.4fr 1fr;
-  gap: 1.2em;
-}
-@media (max-width: 1000px) { .grille-graphiques { grid-template-columns: 1fr; } }
+  renderAnalyses() {
+    const txns = this.transactionsNormales().filter(t => t.sens === 'debit');
+    const aDesDonnees = txns.length > 0;
+    document.getElementById('analyses-vide')?.classList.toggle('cache', aDesDonnees);
+    document.getElementById('analyses-contenu')?.classList.toggle('cache', !aDesDonnees);
+    if (!aDesDonnees) return;
 
-.carte {
-  background: var(--carte);
-  border: 1px solid var(--bordure);
-  border-radius: var(--rayon);
-  box-shadow: var(--ombre);
-  margin-bottom: 1.2em;
-}
-.carte:last-child { margin-bottom: 0; }
-.carte__entete { padding: 1.3em 1.4em 0.2em; display: flex; flex-wrap: wrap; align-items: flex-start; gap: 0.5rem; }
-.carte__entete h3 { margin: 0 0 0.2em; font-size: 1rem; font-weight: 700; flex: 1 1 100%; }
-.carte__entete p { margin: 0; font-size: 0.82rem; color: var(--texte-att); flex: 1; }
-.btn-export {
-  display: inline-flex; align-items: center; gap: 0.35em;
-  padding: 0.3em 0.75em; border: 1px solid var(--bordure-forte);
-  border-radius: var(--rayon-s); background: var(--carte);
-  font-size: 0.78rem; font-weight: 500; color: var(--texte); cursor: pointer;
-  white-space: nowrap; transition: background 0.15s;
-}
-.btn-export:hover { background: var(--fond); }
-.btn-export svg { width: 14px; height: 14px; }
-.carte__corps { padding: 1.2em 1.4em 1.4em; }
+    const mois = this.moisDisponibles(txns);
+    const categories = [...new Set(txns.map(t => t.categorie))].sort();
 
-.chart-zone { height: 320px; }
-.chart-zone--tall { height: 460px; }
+    const matrice = {};
+    categories.forEach(c => matrice[c] = {});
+    txns.forEach(t => {
+      const m = t.date.slice(0, 7);
+      matrice[t.categorie][m] = (matrice[t.categorie][m] || 0) + t.montant;
+    });
 
-/* Grille de mini-graphiques (panel Analyses) */
-#analyses-graphiques {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  gap: 1.25rem;
-  padding: 0.25rem 0 0.5rem;
-}
-.mini-chart-carte {
-  background: var(--fond);
-  border: 1px solid var(--bordure);
-  border-radius: var(--rayon);
-  padding: 0.85rem 1rem 0.75rem;
-}
-.mini-chart-titre {
-  display: flex;
-  align-items: center;
-  font-size: 0.8rem;
-  font-weight: 600;
-  color: var(--texte);
-  margin-bottom: 0.65rem;
-}
-.mini-chart-zone { height: 140px; }
+    ChartsModule.renderMiniLignes('analyses-graphiques', mois, categories, matrice);
 
-/* ---------- Tableaux ---------- */
+    // Tableau récapitulatif : total, moyenne, max par catégorie
+    const totaux = categories.map(cat => {
+      const vals = mois.map(m => matrice[cat][m] || 0);
+      const total = vals.reduce((s, v) => s + v, 0);
+      const moisActifs = vals.filter(v => v > 0).length;
+      const moyenne = moisActifs > 0 ? total / moisActifs : 0;
+      const max = Math.max(...vals);
+      return { cat, total, moyenne, max };
+    }).sort((a, b) => b.total - a.total);
 
-.table-wrap { overflow-x: auto; padding: 0 !important; }
-table { width: 100%; border-collapse: collapse; font-size: 0.86rem; }
-thead th {
-  text-align: left;
-  font-size: 0.72rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--texte-att);
-  padding: 0.85em 1.4em;
-  border-bottom: 1px solid var(--bordure);
-  white-space: nowrap;
-}
-tbody td {
-  padding: 0.75em 1.4em;
-  border-bottom: 1px solid var(--bordure);
-  vertical-align: middle;
-}
-tbody tr:last-child td { border-bottom: none; }
-tbody tr:hover { background: var(--fond); }
-td.montant { text-align: right; font-weight: 700; white-space: nowrap; font-variant-numeric: tabular-nums; }
+    const recap = document.getElementById('analyses-recap');
+    if (!recap) return;
+    recap.innerHTML = `
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Catégorie</th><th class="mono al-droite">Total</th><th class="mono al-droite">Moy./mois actif</th><th class="mono al-droite">Mois max</th></tr></thead>
+          <tbody>
+            ${totaux.map(({ cat, total, moyenne, max }) => `
+              <tr>
+                <td><span class="dot" style="background:${ChartsModule.couleurPour(cat, 0)}"></span>${this.escape(cat)}</td>
+                <td class="mono al-droite neg">${this.formatMontant(total)}</td>
+                <td class="mono al-droite">${this.formatMontant(moyenne)}</td>
+                <td class="mono al-droite">${this.formatMontant(max)}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+    `;
+  },
 
-.tag {
-  display: inline-flex;
-  align-items: center;
-  font-size: 0.74rem;
-  font-weight: 600;
-  padding: 0.25em 0.65em;
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--tag-color, #999) 12%, white);
-  color: var(--tag-color, #555);
-}
+  // ---------------------------------------------------------------------
+  // Vue mensuelle (tableau croisé)
+  // ---------------------------------------------------------------------
 
-/* ---------- Tableau croisé ---------- */
+  renderTableauCroise() {
+    const txns = this.transactionsNormales().filter(t => t.sens === 'debit');
+    const el = document.getElementById('tableau-croise');
 
-.table-croisee th, .table-croisee td { text-align: right; }
-.table-croisee th:first-child, .table-croisee td:first-child { text-align: left; }
-.table-croisee .total-col { border-left: 2px solid var(--bordure); font-weight: 700; }
-.table-croisee .cellule-vide { color: var(--bordure-forte); }
-.table-croisee .ligne-total td {
-  font-weight: 800;
-  background: var(--fond);
-  border-top: 2px solid var(--texte);
-}
+    if (txns.length === 0) {
+      el.innerHTML = '<p class="vide">Aucune dépense catégorisée pour le moment. Importe un relevé pour commencer.</p>';
+      return;
+    }
 
-/* ---------- Onglet Import ---------- */
+    const mois = this.moisDisponibles(txns);
+    const categories = [...new Set(txns.map(t => t.categorie))].sort();
 
-.import-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 1.2em;
-  margin-bottom: 1.2em;
-}
-@media (max-width: 760px) { .import-grid { grid-template-columns: 1fr; } }
+    const matrice = {};
+    categories.forEach(c => matrice[c] = {});
+    txns.forEach(t => {
+      const m = t.date.slice(0, 7);
+      matrice[t.categorie][m] = (matrice[t.categorie][m] || 0) + t.montant;
+    });
 
-.import-carte { padding: 1.4em; }
-.import-carte__entete {
-  display: flex;
-  align-items: center;
-  gap: 0.8em;
-  margin-bottom: 1.2em;
-}
-.import-carte__avatar {
-  width: 38px; height: 38px;
-  border-radius: 50%;
-  display: flex; align-items: center; justify-content: center;
-  font-weight: 700;
-  font-size: 0.95rem;
-  color: #fff;
-  flex-shrink: 0;
-}
-.import-carte[data-personne-couleur="monsieur"] .import-carte__avatar { background: #4F6BFF; }
-.import-carte[data-personne-couleur="madame"] .import-carte__avatar { background: #D6589F; }
-.import-carte h3 { margin: 0; font-size: 0.98rem; font-weight: 700; }
-.import-carte p { margin: 0.1em 0 0; font-size: 0.8rem; color: var(--texte-att); }
+    const totalParMois = {};
+    mois.forEach(m => {
+      totalParMois[m] = categories.reduce((s, c) => s + (matrice[c][m] || 0), 0);
+    });
+    const totalGeneral = Object.values(totalParMois).reduce((s, v) => s + v, 0);
 
-.zone-upload {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  text-align: center;
-  gap: 0.5em;
-  border: 1.5px dashed var(--bordure-forte);
-  border-radius: var(--rayon);
-  padding: 2.2em 1.2em;
-  cursor: pointer;
-  color: var(--texte-att);
-  transition: border-color 0.12s ease, background 0.12s ease;
-}
-.zone-upload:hover { border-color: var(--accent); background: var(--accent-fond); color: var(--accent-fonce); }
-.zone-upload svg { width: 30px; height: 30px; margin-bottom: 0.2em; }
-.zone-upload__texte { font-size: 0.86rem; font-weight: 600; color: var(--texte); }
-.zone-upload__precision { font-size: 0.76rem; color: var(--texte-faible); }
+    let html = '<div class="table-wrap"><table class="table-croisee"><thead><tr><th>Catégorie</th>';
+    mois.forEach(m => html += `<th class="mono">${ChartsModule.libelleMoisCourt(m)}</th>`);
+    html += '<th class="mono total-col">Total</th></tr></thead><tbody>';
 
-#import-statut:empty { display: none; }
-#import-statut { margin-bottom: 1.2em; }
+    categories.forEach(cat => {
+      const totalLigne = mois.reduce((s, m) => s + (matrice[cat][m] || 0), 0);
+      html += `<tr><td><span class="dot" style="background:${ChartsModule.couleurPour(cat, 0)}"></span>${this.escape(cat)}</td>`;
+      mois.forEach(m => {
+        const v = matrice[cat][m] || 0;
+        html += `<td class="mono ${v === 0 ? 'cellule-vide' : ''}">${v === 0 ? '—' : this.formatMontant(v)}</td>`;
+      });
+      html += `<td class="mono total-col">${this.formatMontant(totalLigne)}</td></tr>`;
+    });
 
-.alerte-bloc {
-  border-radius: var(--rayon);
-  padding: 1em 1.3em;
-  font-size: 0.86rem;
-  display: flex;
-  align-items: flex-start;
-  gap: 0.8em;
-}
-.alerte-bloc strong { display: block; margin-bottom: 0.15em; }
-.alerte-bloc p { margin: 0; color: var(--texte-att); }
-.alerte-bloc.erreur { background: var(--rouge-fond); color: var(--rouge); }
-.alerte-bloc.erreur p { color: #b23a3e; }
-.alerte-bloc.succes { background: var(--vert-fond); color: var(--vert); }
-.alerte-bloc.succes p { color: #0c7a46; }
+    html += `<tr class="ligne-total"><td>Total</td>`;
+    mois.forEach(m => html += `<td class="mono">${this.formatMontant(totalParMois[m])}</td>`);
+    html += `<td class="mono total-col">${this.formatMontant(totalGeneral)}</td></tr>`;
+    html += '</tbody></table></div>';
 
-.nav-item--danger { color: var(--texte-att); }
+    el.innerHTML = html;
 
-/* ---------- Toast ---------- */
+    // Afficher le bouton d'export
+    document.getElementById('btn-export-croise')?.classList.remove('cache');
 
-.toast {
-  position: fixed;
-  bottom: 1.6em;
-  left: 50%;
-  transform: translateX(-50%) translateY(120%);
-  background: var(--texte);
-  color: #fff;
-  padding: 0.85em 1.4em;
-  border-radius: var(--rayon-s);
-  font-size: 0.86rem;
-  font-weight: 500;
-  box-shadow: var(--ombre-hover);
-  z-index: 100;
-  transition: transform 0.25s cubic-bezier(.2,.8,.3,1);
-  display: flex;
-  align-items: center;
-  gap: 0.6em;
-}
-.toast.visible { transform: translateX(-50%) translateY(0); }
-.toast strong { font-weight: 700; }
+    // Stocker les données pour l'export (remplacées à chaque render)
+    this._croiseData = { mois, categories, matrice, totalParMois, totalGeneral };
+  },
 
-/* ---------- Accessibilité ---------- */
+  exportCroiseCSV() {
+    const { mois, categories, matrice, totalParMois, totalGeneral } = this._croiseData || {};
+    if (!mois) return;
 
-@media (prefers-reduced-motion: reduce) {
-  * { transition: none !important; animation: none !important; }
-}
+    const sep = ';';
+    const num = v => v.toFixed(2).replace('.', ','); // format décimal français
+    const lignes = [];
 
-/* ---------- Responsive ---------- */
+    // En-tête
+    lignes.push(['Catégorie', ...mois.map(m => ChartsModule.libelleMoisCourt(m)), 'Total'].join(sep));
 
-@media (max-width: 880px) {
-  .shell { flex-direction: column; }
-  .sidebar { width: 100%; height: auto; position: relative; flex-direction: row; align-items: center; overflow-x: auto; }
-  .sidebar__brand { padding: 0.4em 1em 0.4em 0.2em; }
-  .sidebar__nav { flex-direction: row; flex: none; }
-  .nav-item { white-space: nowrap; }
-  .sidebar__bas { border-top: none; border-left: 1px solid var(--bordure); padding-top: 0; padding-left: 0.6em; margin-left: 0.4em; }
-  .topbar { flex-direction: column; align-items: flex-start; gap: 0.8em; padding: 1em 1.2em; }
-  .topbar__droite { width: 100%; justify-content: space-between; }
-  .contenu { padding: 1.2em; }
-}
+    // Lignes catégories
+    categories.forEach(cat => {
+      const totalLigne = mois.reduce((s, m) => s + (matrice[cat][m] || 0), 0);
+      lignes.push([cat, ...mois.map(m => num(matrice[cat][m] || 0)), num(totalLigne)].join(sep));
+    });
+
+    // Ligne totaux
+    lignes.push(['Total', ...mois.map(m => num(totalParMois[m])), num(totalGeneral)].join(sep));
+
+    const bom = '﻿'; // BOM UTF-8 pour Excel
+    const blob = new Blob([bom + lignes.join('\r\n')], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `pulse-vue-mensuelle-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  },
+
+  // ---------------------------------------------------------------------
+  // Virements internes
+  // ---------------------------------------------------------------------
+
+  renderVirements() {
+    const el = document.getElementById('virements-corps');
+    let txns = this.state.transactions.filter(t => t.statut === 'virement_interne');
+    if (this.filtrePersonne !== 'tous') txns = txns.filter(t => t.personne === this.filtrePersonne);
+    txns = [...txns].sort((a, b) => b.date.localeCompare(a.date));
+
+    if (txns.length === 0) {
+      el.innerHTML = '<tr><td colspan="5" class="vide">Aucun virement interne détecté.</td></tr>';
+      return;
+    }
+
+    el.innerHTML = txns.map(t => `
+      <tr>
+        <td class="mono">${this.formatDate(t.date)}</td>
+        <td>${this.escape(t.libelle)}</td>
+        <td>${this.labelPersonne(t.personne)}</td>
+        <td class="mono">${this.escape(t.sousCategorie)}</td>
+        <td class="mono montant ${t.sens === 'credit' ? 'pos' : 'neg'}">${t.sens === 'credit' ? '+' : '−'}${this.formatMontant(t.montant).replace('-', '')}</td>
+      </tr>
+    `).join('');
+  },
+
+  // ---------------------------------------------------------------------
+  // Non catégorisées
+  // ---------------------------------------------------------------------
+
+  renderNonCategorisees() {
+    const el = document.getElementById('noncat-corps');
+    let txns = this.state.transactions.filter(t => t.statut === 'non_categorisee');
+    if (this.filtrePersonne !== 'tous') txns = txns.filter(t => t.personne === this.filtrePersonne);
+    txns = [...txns].sort((a, b) => b.date.localeCompare(a.date));
+
+    if (txns.length === 0) {
+      el.innerHTML = '<tr><td colspan="5" class="vide">Aucune transaction à catégoriser.</td></tr>';
+      return;
+    }
+
+    el.innerHTML = txns.map(t => `
+      <tr>
+        <td class="mono">${this.formatDate(t.date)}</td>
+        <td>${this.escape(t.libelle)}</td>
+        <td>${this.labelPersonne(t.personne)}</td>
+        <td class="mono">${this.escape(t.sousCategorie)}</td>
+        <td class="mono montant ${t.sens === 'credit' ? 'pos' : 'neg'}">${t.sens === 'credit' ? '+' : '−'}${this.formatMontant(t.montant).replace('-', '')}</td>
+      </tr>
+    `).join('');
+  },
+
+  // ---------------------------------------------------------------------
+  // Navigation
+  // ---------------------------------------------------------------------
+
+  allerVersPanel(panel) {
+    document.querySelectorAll('.nav-item[data-panel]').forEach(item => {
+      item.classList.toggle('active', item.dataset.panel === panel);
+    });
+    document.querySelectorAll('.panel-principal').forEach(p => {
+      p.classList.toggle('active', p.id === 'panel-' + panel);
+    });
+    document.getElementById('topbar-titre').textContent = this.TITRES_PANEL[panel] || '';
+  },
+
+  // ---------------------------------------------------------------------
+  // Événements
+  // ---------------------------------------------------------------------
+
+  bindEvents() {
+    document.querySelectorAll('.nav-item[data-panel]').forEach(item => {
+      item.addEventListener('click', () => this.allerVersPanel(item.dataset.panel));
+    });
+
+    document.getElementById('btn-importer-topbar').addEventListener('click', () => this.allerVersPanel('import'));
+    document.getElementById('btn-importer-vide').addEventListener('click', () => this.allerVersPanel('import'));
+    document.getElementById('btn-importer-analyses')?.addEventListener('click', () => this.allerVersPanel('import'));
+    document.getElementById('btn-export-croise')?.addEventListener('click', () => this.exportCroiseCSV());
+
+    document.querySelectorAll('#filtre-personne .segmente__item').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('#filtre-personne .segmente__item').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        this.filtrePersonne = btn.dataset.valeur;
+        this.renderAll();
+      });
+    });
+
+    document.getElementById('input-csv-monsieur').addEventListener('change', (e) => {
+      if (e.target.files[0]) this.onFichierChoisi(e.target.files[0], 'monsieur');
+    });
+    document.getElementById('input-csv-madame').addEventListener('change', (e) => {
+      if (e.target.files[0]) this.onFichierChoisi(e.target.files[0], 'madame');
+    });
+
+    // Glisser-déposer sur les zones d'upload
+    [['input-csv-monsieur', 'monsieur'], ['input-csv-madame', 'madame']].forEach(([inputId, personne]) => {
+      const input = document.getElementById(inputId);
+      const zone = input.closest('.import-carte').querySelector('.zone-upload');
+      ['dragover', 'dragleave', 'drop'].forEach(evt => {
+        zone.addEventListener(evt, (e) => e.preventDefault());
+      });
+      zone.addEventListener('drop', (e) => {
+        const file = e.dataTransfer.files[0];
+        if (file) this.onFichierChoisi(file, personne);
+      });
+    });
+
+    document.getElementById('btn-reset').addEventListener('click', () => this.confirmerReset());
+  },
+
+  confirmerReset() {
+    if (!confirm('Cela supprime définitivement toutes les transactions importées. Continuer ?')) return;
+    Store.resetAll();
+    this.state = Store.getState();
+    this.renderAll();
+    this.toast('Toutes les données ont été effacées.');
+  },
+};
+
+document.addEventListener('DOMContentLoaded', () => App.init());
