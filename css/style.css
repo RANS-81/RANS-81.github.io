@@ -321,6 +321,30 @@ button { font-family: inherit; }
 .carte__corps { padding: 1.2em 1.4em 1.4em; }
 
 .chart-zone { height: 320px; }
+.chart-zone--tall { height: 460px; }
+
+/* Grille de mini-graphiques (panel Analyses) */
+#analyses-graphiques {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 1.25rem;
+  padding: 0.25rem 0 0.5rem;
+}
+.mini-chart-carte {
+  background: var(--fond);
+  border: 1px solid var(--bordure);
+  border-radius: var(--rayon);
+  padding: 0.85rem 1rem 0.75rem;
+}
+.mini-chart-titre {
+  display: flex;
+  align-items: center;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--texte);
+  margin-bottom: 0.65rem;
+}
+.mini-chart-zone { height: 140px; }
 
 /* ---------- Tableaux ---------- */
 
