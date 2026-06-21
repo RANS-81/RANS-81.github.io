@@ -167,30 +167,45 @@ const App = {
   },
 
   renderDashboard() {
-    const txns = this.transactionsNormales().filter(t => t.sens === 'debit');
+    const allTxns = this.transactionsNormales();
+    const depenses = allTxns.filter(t => t.sens === 'debit');
+    const credits = allTxns.filter(t => t.sens === 'credit');
 
-    const mois = this.moisDisponibles(txns);
-    const categories = [...new Set(txns.map(t => t.categorie))].sort();
-
+    // Matrice dépenses
+    const mois = this.moisDisponibles(depenses);
+    const categories = [...new Set(depenses.map(t => t.categorie))].sort();
     const matrice = {};
     categories.forEach(c => matrice[c] = {});
-    txns.forEach(t => {
-      matrice[t.categorie][t.date.slice(0, 7)] = (matrice[t.categorie][t.date.slice(0, 7)] || 0) + t.montant;
+    depenses.forEach(t => {
+      const m = t.date.slice(0, 7);
+      matrice[t.categorie][m] = (matrice[t.categorie][m] || 0) + t.montant;
     });
-
     const totauxCategorie = {};
     categories.forEach(c => {
       totauxCategorie[c] = Object.values(matrice[c]).reduce((s, v) => s + v, 0);
     });
 
-    const totalDepenses = Object.values(totauxCategorie).reduce((s, v) => s + v, 0);
-    const revenus = this.transactionsNormales().filter(t => t.sens === 'credit').reduce((s, t) => s + t.montant, 0);
+    // Matrice revenus
+    const moisRev = this.moisDisponibles(credits);
+    const catsRev = [...new Set(credits.map(t => t.categorie))].sort();
+    const matriceRev = {};
+    catsRev.forEach(c => matriceRev[c] = {});
+    credits.forEach(t => {
+      const m = t.date.slice(0, 7);
+      matriceRev[t.categorie][m] = (matriceRev[t.categorie][m] || 0) + t.montant;
+    });
+    const totauxRev = {};
+    catsRev.forEach(c => {
+      totauxRev[c] = Object.values(matriceRev[c]).reduce((s, v) => s + v, 0);
+    });
 
-    document.getElementById('dash-revenus').textContent = this.formatMontant(revenus);
+    const totalDepenses = Object.values(totauxCategorie).reduce((s, v) => s + v, 0);
+    const totalRevenus = Object.values(totauxRev).reduce((s, v) => s + v, 0);
+
+    document.getElementById('dash-revenus').textContent = this.formatMontant(totalRevenus);
     document.getElementById('dash-depenses').textContent = this.formatMontant(totalDepenses);
-    const net = revenus - totalDepenses;
-    document.getElementById('dash-net').textContent = this.formatMontant(net);
-    document.getElementById('dash-nb-mois').textContent = mois.length;
+    document.getElementById('dash-net').textContent = this.formatMontant(totalRevenus - totalDepenses);
+    document.getElementById('dash-nb-mois').textContent = Math.max(mois.length, moisRev.length);
 
     const aDesDonnees = this.state.transactions.length > 0;
     document.getElementById('dashboard-vide').classList.toggle('cache', aDesDonnees);
@@ -198,8 +213,50 @@ const App = {
 
     if (!aDesDonnees) return;
 
-    ChartsModule.renderParMois('chart-par-mois', mois, categories, matrice);
-    ChartsModule.renderParCategorie('chart-par-categorie', totauxCategorie);
+    // Graphiques dépenses avec onClick → détail transactions
+    ChartsModule.renderParMois('chart-par-mois', mois, categories, matrice, (cat, moisLabel) => {
+      const txns = depenses.filter(t => t.categorie === cat && t.date.slice(0, 7) === moisLabel);
+      this.ouvrirModal(`${cat} — ${ChartsModule.libelleMoisCourt(moisLabel)}`, txns);
+    });
+    ChartsModule.renderParCategorie('chart-par-categorie', totauxCategorie, (cat) => {
+      const txns = depenses.filter(t => t.categorie === cat);
+      this.ouvrirModal(cat, txns);
+    });
+
+    // Graphiques revenus avec onClick → détail transactions
+    ChartsModule.renderParMois('chart-revenus-mois', moisRev, catsRev, matriceRev, (cat, moisLabel) => {
+      const txns = credits.filter(t => t.categorie === cat && t.date.slice(0, 7) === moisLabel);
+      this.ouvrirModal(`${cat} — ${ChartsModule.libelleMoisCourt(moisLabel)}`, txns);
+    });
+    ChartsModule.renderParCategorie('chart-revenus-categorie', totauxRev, (cat) => {
+      const txns = credits.filter(t => t.categorie === cat);
+      this.ouvrirModal(cat, txns);
+    });
+  },
+
+  ouvrirModal(titre, txns) {
+    document.getElementById('modal-titre').textContent = titre;
+    const corps = document.getElementById('modal-corps');
+    if (txns.length === 0) {
+      corps.innerHTML = '<p class="vide">Aucune transaction.</p>';
+    } else {
+      corps.innerHTML = `
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Date</th><th>Libellé</th><th>Personne</th><th class="al-droite mono">Montant</th></tr></thead>
+            <tbody>
+              ${[...txns].sort((a, b) => b.date.localeCompare(a.date)).map(t => `
+                <tr>
+                  <td class="mono">${this.formatDate(t.date)}</td>
+                  <td>${this.escape(t.libelle)}</td>
+                  <td>${this.labelPersonne(t.personne)}</td>
+                  <td class="mono al-droite ${t.sens === 'credit' ? 'pos' : 'neg'}">${this.formatMontant(t.montant)}</td>
+                </tr>`).join('')}
+            </tbody>
+          </table>
+        </div>`;
+    }
+    document.getElementById('modal-detail').classList.remove('cache');
   },
 
   // ---------------------------------------------------------------------
@@ -453,6 +510,12 @@ const App = {
     });
 
     document.getElementById('btn-reset').addEventListener('click', () => this.confirmerReset());
+
+    document.getElementById('modal-fermer')?.addEventListener('click', () =>
+      document.getElementById('modal-detail').classList.add('cache'));
+    document.getElementById('modal-detail')?.addEventListener('click', (e) => {
+      if (e.target === e.currentTarget) document.getElementById('modal-detail').classList.add('cache');
+    });
   },
 
   confirmerReset() {
