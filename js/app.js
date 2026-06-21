@@ -209,8 +209,8 @@ const App = {
   renderAnalyses() {
     const txns = this.transactionsNormales().filter(t => t.sens === 'debit');
     const aDesDonnees = txns.length > 0;
-    document.getElementById('analyses-vide').classList.toggle('cache', aDesDonnees);
-    document.getElementById('analyses-contenu').classList.toggle('cache', !aDesDonnees);
+    document.getElementById('analyses-vide')?.classList.toggle('cache', aDesDonnees);
+    document.getElementById('analyses-contenu')?.classList.toggle('cache', !aDesDonnees);
     if (!aDesDonnees) return;
 
     const mois = this.moisDisponibles(txns);
@@ -236,6 +236,7 @@ const App = {
     }).sort((a, b) => b.total - a.total);
 
     const recap = document.getElementById('analyses-recap');
+    if (!recap) return;
     recap.innerHTML = `
       <div class="table-wrap">
         <table>
@@ -419,7 +420,7 @@ const App = {
 
     document.getElementById('btn-importer-topbar').addEventListener('click', () => this.allerVersPanel('import'));
     document.getElementById('btn-importer-vide').addEventListener('click', () => this.allerVersPanel('import'));
-    document.getElementById('btn-importer-analyses').addEventListener('click', () => this.allerVersPanel('import'));
+    document.getElementById('btn-importer-analyses')?.addEventListener('click', () => this.allerVersPanel('import'));
     document.getElementById('btn-export-croise')?.addEventListener('click', () => this.exportCroiseCSV());
 
     document.querySelectorAll('#filtre-personne .segmente__item').forEach(btn => {
