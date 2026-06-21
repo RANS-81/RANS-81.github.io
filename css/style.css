@@ -315,9 +315,18 @@ button { font-family: inherit; }
   margin-bottom: 1.2em;
 }
 .carte:last-child { margin-bottom: 0; }
-.carte__entete { padding: 1.3em 1.4em 0.2em; }
-.carte__entete h3 { margin: 0 0 0.2em; font-size: 1rem; font-weight: 700; }
-.carte__entete p { margin: 0; font-size: 0.82rem; color: var(--texte-att); }
+.carte__entete { padding: 1.3em 1.4em 0.2em; display: flex; flex-wrap: wrap; align-items: flex-start; gap: 0.5rem; }
+.carte__entete h3 { margin: 0 0 0.2em; font-size: 1rem; font-weight: 700; flex: 1 1 100%; }
+.carte__entete p { margin: 0; font-size: 0.82rem; color: var(--texte-att); flex: 1; }
+.btn-export {
+  display: inline-flex; align-items: center; gap: 0.35em;
+  padding: 0.3em 0.75em; border: 1px solid var(--bordure-forte);
+  border-radius: var(--rayon-s); background: var(--carte);
+  font-size: 0.78rem; font-weight: 500; color: var(--texte); cursor: pointer;
+  white-space: nowrap; transition: background 0.15s;
+}
+.btn-export:hover { background: var(--fond); }
+.btn-export svg { width: 14px; height: 14px; }
 .carte__corps { padding: 1.2em 1.4em 1.4em; }
 
 .chart-zone { height: 320px; }
