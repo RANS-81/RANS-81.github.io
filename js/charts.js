@@ -32,6 +32,7 @@ const ChartsModule = {
    */
   renderParMois(canvasId, labelsMois, categories, matrice) {
     const ctx = document.getElementById(canvasId);
+    if (typeof Chart === 'undefined') return;
     if (!ctx) return;
     this._parMois?.destroy();
 
@@ -76,6 +77,7 @@ const ChartsModule = {
    */
   renderParCategorie(canvasId, totauxParCategorie) {
     const ctx = document.getElementById(canvasId);
+    if (typeof Chart === 'undefined') return;
     if (!ctx) return;
     this._parCategorie?.destroy();
 
