@@ -306,7 +306,7 @@ const App = {
     el.innerHTML = html;
 
     // Afficher le bouton d'export
-    document.getElementById('btn-export-croise').classList.remove('cache');
+    document.getElementById('btn-export-croise')?.classList.remove('cache');
 
     // Stocker les données pour l'export (remplacées à chaque render)
     this._croiseData = { mois, categories, matrice, totalParMois, totalGeneral };
@@ -420,7 +420,7 @@ const App = {
     document.getElementById('btn-importer-topbar').addEventListener('click', () => this.allerVersPanel('import'));
     document.getElementById('btn-importer-vide').addEventListener('click', () => this.allerVersPanel('import'));
     document.getElementById('btn-importer-analyses').addEventListener('click', () => this.allerVersPanel('import'));
-    document.getElementById('btn-export-croise').addEventListener('click', () => this.exportCroiseCSV());
+    document.getElementById('btn-export-croise')?.addEventListener('click', () => this.exportCroiseCSV());
 
     document.querySelectorAll('#filtre-personne .segmente__item').forEach(btn => {
       btn.addEventListener('click', () => {
