@@ -5,8 +5,7 @@
  */
 
 const ChartsModule = {
-  _parMois: null,
-  _parCategorie: null,
+  _charts: {},   // keyed by canvasId
   _miniCharts: [],
 
   palette: [
@@ -22,8 +21,8 @@ const ChartsModule = {
   },
 
   destroyAll() {
-    this._parMois?.destroy();
-    this._parCategorie?.destroy();
+    Object.values(this._charts).forEach(c => c?.destroy());
+    this._charts = {};
     (this._miniCharts || []).forEach(c => c.destroy());
     this._miniCharts = [];
   },
@@ -33,10 +32,10 @@ const ChartsModule = {
    * @param categories ['Alimentation', ...]
    * @param matrice { categorie: { '2026-01': montant, ... } }
    */
-  renderParMois(canvasId, labelsMois, categories, matrice) {
+  renderParMois(canvasId, labelsMois, categories, matrice, onClic) {
     const ctx = document.getElementById(canvasId);
     if (!ctx) return;
-    this._parMois?.destroy();
+    this._charts[canvasId]?.destroy();
 
     if (categories.length === 0 || labelsMois.length === 0) {
       ctx.getContext('2d').clearRect(0, 0, ctx.width, ctx.height);
@@ -48,15 +47,22 @@ const ChartsModule = {
       data: labelsMois.map(m => Number((matrice[cat]?.[m] || 0).toFixed(2))),
       backgroundColor: this.couleurPour(cat, i),
       borderRadius: 2,
-      stack: 'depenses',
+      stack: 'stack',
     }));
 
-    this._parMois = new Chart(ctx, {
+    this._charts[canvasId] = new Chart(ctx, {
       type: 'bar',
       data: { labels: labelsMois.map(m => this.libelleMoisCourt(m)), datasets },
       options: {
         responsive: true,
         maintainAspectRatio: false,
+        cursor: onClic ? 'pointer' : 'default',
+        onClick: onClic ? (evt, els) => {
+          if (!els.length) return;
+          const cat = categories[els[0].datasetIndex];
+          const moisLabel = labelsMois[els[0].index];
+          onClic(cat, moisLabel);
+        } : undefined,
         plugins: {
           legend: {
             position: 'bottom',
@@ -74,13 +80,10 @@ const ChartsModule = {
     });
   },
 
-  /**
-   * @param totauxParCategorie { categorie: montantTotal }
-   */
-  renderParCategorie(canvasId, totauxParCategorie) {
+  renderParCategorie(canvasId, totauxParCategorie, onClic) {
     const ctx = document.getElementById(canvasId);
     if (!ctx) return;
-    this._parCategorie?.destroy();
+    this._charts[canvasId]?.destroy();
 
     const entries = Object.entries(totauxParCategorie).sort((a, b) => b[1] - a[1]);
     if (entries.length === 0) {
@@ -92,7 +95,7 @@ const ChartsModule = {
     const data = entries.map(([, v]) => Number(v.toFixed(2)));
     const colors = entries.map(([nom], i) => this.couleurPour(nom, i));
 
-    this._parCategorie = new Chart(ctx, {
+    this._charts[canvasId] = new Chart(ctx, {
       type: 'bar',
       data: {
         labels,
@@ -102,6 +105,10 @@ const ChartsModule = {
         indexAxis: 'y',
         responsive: true,
         maintainAspectRatio: false,
+        onClick: onClic ? (evt, els) => {
+          if (!els.length) return;
+          onClic(labels[els[0].index]);
+        } : undefined,
         plugins: {
           legend: { display: false },
           tooltip: { callbacks: { label: (c) => `${c.parsed.x.toFixed(2)} €` } },
