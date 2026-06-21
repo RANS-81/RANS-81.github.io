@@ -7,6 +7,7 @@
 const ChartsModule = {
   _parMois: null,
   _parCategorie: null,
+  _miniCharts: [],
 
   palette: [
     '#5B5FEF', '#12A35E', '#F5A524', '#E5484D', '#0EA5C4', '#D6589F',
@@ -23,6 +24,8 @@ const ChartsModule = {
   destroyAll() {
     this._parMois?.destroy();
     this._parCategorie?.destroy();
+    (this._miniCharts || []).forEach(c => c.destroy());
+    this._miniCharts = [];
   },
 
   /**
@@ -32,7 +35,6 @@ const ChartsModule = {
    */
   renderParMois(canvasId, labelsMois, categories, matrice) {
     const ctx = document.getElementById(canvasId);
-    if (typeof Chart === 'undefined') return;
     if (!ctx) return;
     this._parMois?.destroy();
 
@@ -77,7 +79,6 @@ const ChartsModule = {
    */
   renderParCategorie(canvasId, totauxParCategorie) {
     const ctx = document.getElementById(canvasId);
-    if (typeof Chart === 'undefined') return;
     if (!ctx) return;
     this._parCategorie?.destroy();
 
@@ -110,6 +111,73 @@ const ChartsModule = {
           y: { ticks: { font: { family: "'Inter', sans-serif", size: 11 }, color: '#15182B' }, grid: { display: false } },
         },
       },
+    });
+  },
+
+  renderMiniLignes(containerId, labelsMois, categories, matrice) {
+    if (typeof Chart === 'undefined') return;
+    const container = document.getElementById(containerId);
+    if (!container) return;
+
+    // Destroy previous mini charts
+    (this._miniCharts || []).forEach(c => c.destroy());
+    this._miniCharts = [];
+    container.innerHTML = '';
+
+    if (categories.length === 0 || labelsMois.length === 0) return;
+
+    const labels = labelsMois.map(m => this.libelleMoisCourt(m));
+
+    categories.forEach((cat) => {
+      const couleur = this.couleurPour(cat, 0);
+      const data = labelsMois.map(m => Number((matrice[cat]?.[m] || 0).toFixed(2)));
+
+      const wrapper = document.createElement('div');
+      wrapper.className = 'mini-chart-carte';
+
+      const titre = document.createElement('div');
+      titre.className = 'mini-chart-titre';
+      titre.innerHTML = `<span class="dot" style="background:${couleur}"></span>${cat}`;
+
+      const canvasWrap = document.createElement('div');
+      canvasWrap.className = 'mini-chart-zone';
+
+      const canvas = document.createElement('canvas');
+      canvasWrap.appendChild(canvas);
+      wrapper.appendChild(titre);
+      wrapper.appendChild(canvasWrap);
+      container.appendChild(wrapper);
+
+      const chart = new Chart(canvas, {
+        type: 'line',
+        data: {
+          labels,
+          datasets: [{
+            data,
+            borderColor: couleur,
+            backgroundColor: couleur + '22',
+            fill: true,
+            tension: 0.3,
+            pointRadius: labelsMois.length > 12 ? 2 : 4,
+            pointHoverRadius: 6,
+            borderWidth: 2,
+          }],
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false },
+            tooltip: { callbacks: { label: (c) => `${c.parsed.y.toFixed(2)} €` } },
+          },
+          scales: {
+            x: { ticks: { font: { family: "'Inter', sans-serif", size: 9 }, color: '#6B7088', maxRotation: 45 }, grid: { display: false } },
+            y: { ticks: { font: { family: "'Inter', sans-serif", size: 9 }, color: '#6B7088' }, grid: { color: '#E7E9F1' }, beginAtZero: true },
+          },
+        },
+      });
+
+      this._miniCharts.push(chart);
     });
   },
 
