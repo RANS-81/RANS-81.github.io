@@ -42,6 +42,10 @@
         À catégoriser
         <span class="nav-badge cache" id="badge-noncat">0</span>
       </button>
+      <button class="nav-item" data-panel="analyses" role="tab">
+        <svg viewBox="0 0 20 20" fill="none"><path d="M3 14.5 7.5 9l3.5 3 4-5.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><circle cx="3" cy="14.5" r="1" fill="currentColor"/><circle cx="7.5" cy="9" r="1" fill="currentColor"/><circle cx="11" cy="12" r="1" fill="currentColor"/><circle cx="15" cy="6.5" r="1" fill="currentColor"/></svg>
+        Analyses
+      </button>
       <button class="nav-item" data-panel="import" role="tab">
         <svg viewBox="0 0 20 20" fill="none"><path d="M10 13V4M6.5 7.5 10 4l3.5 3.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 13.5v1.2a1.3 1.3 0 0 0 1.3 1.3h9.4a1.3 1.3 0 0 0 1.3-1.3v-1.2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
         Importer
@@ -136,6 +140,36 @@
           </div>
           <div class="carte__corps" id="tableau-croise"></div>
         </section>
+      </section>
+
+      <!-- ============ Analyses ============ -->
+      <section class="panel-principal" id="panel-analyses">
+
+        <div id="analyses-vide" class="etat-vide">
+          <div class="etat-vide__icone">
+            <svg viewBox="0 0 48 48" fill="none"><path d="M6 36 16 22l8 7 10-13 8 9" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="6" cy="36" r="2" fill="currentColor"/><circle cx="16" cy="22" r="2" fill="currentColor"/><circle cx="24" cy="29" r="2" fill="currentColor"/><circle cx="34" cy="16" r="2" fill="currentColor"/><circle cx="42" cy="25" r="2" fill="currentColor"/></svg>
+          </div>
+          <h2>Aucune donnée pour le moment</h2>
+          <p>Importe un relevé bancaire pour afficher les courbes par catégorie.</p>
+          <button class="btn-accent" id="btn-importer-analyses">Importer un relevé</button>
+        </div>
+
+        <div id="analyses-contenu" class="cache">
+          <section class="carte">
+            <div class="carte__entete">
+              <h3>Évolution mensuelle par catégorie</h3>
+              <p>Un graphique par catégorie de dépense</p>
+            </div>
+            <div class="carte__corps" id="analyses-graphiques"></div>
+          </section>
+
+          <section class="carte" style="margin-top:1.5rem">
+            <div class="carte__entete">
+              <h3>Récapitulatif par catégorie</h3>
+            </div>
+            <div class="carte__corps" id="analyses-recap"></div>
+          </section>
+        </div>
       </section>
 
       <!-- ============ Virements ============ -->
