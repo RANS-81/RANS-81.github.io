@@ -128,6 +128,23 @@
               <div class="carte__corps chart-zone"><canvas id="chart-par-categorie"></canvas></div>
             </section>
           </div>
+
+          <div class="grille-graphiques" style="margin-top:1.5rem">
+            <section class="carte carte--large">
+              <div class="carte__entete">
+                <h3>Revenus par mois</h3>
+                <p>Répartis par catégorie</p>
+              </div>
+              <div class="carte__corps chart-zone"><canvas id="chart-revenus-mois"></canvas></div>
+            </section>
+            <section class="carte">
+              <div class="carte__entete">
+                <h3>Cumulé revenus</h3>
+                <p>Sur toute la période</p>
+              </div>
+              <div class="carte__corps chart-zone"><canvas id="chart-revenus-categorie"></canvas></div>
+            </section>
+          </div>
         </div>
       </section>
 
@@ -260,6 +277,17 @@
 
 <!-- Toast de confirmation -->
 <div class="toast" id="toast"></div>
+
+<!-- Modal détail transactions -->
+<div class="modal-fond cache" id="modal-detail">
+  <div class="modal">
+    <div class="modal__entete">
+      <h3 id="modal-titre">Détail</h3>
+      <button class="modal__fermer" id="modal-fermer">✕</button>
+    </div>
+    <div class="modal__corps" id="modal-corps"></div>
+  </div>
+</div>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
 <script src="js/storage.js"></script>
