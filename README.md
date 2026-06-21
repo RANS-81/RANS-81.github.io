@@ -1,9 +1,14 @@
-# Registre — Suivi de budget du foyer
+# Pulse — Suivi de budget du foyer
 
 Application web de suivi de budget à partir de relevés bancaires CSV, pour
-deux personnes du même foyer. Aucune dépendance de build : HTML / CSS /
-JavaScript natifs. Le seul script externe est
+deux personnes du même foyer. Design sobre type fintech (sidebar de
+navigation, cartes blanches arrondies, accent indigo). Aucune dépendance de
+build : HTML / CSS / JavaScript natifs. Le seul script externe est
 [Chart.js](https://www.chartjs.org/) chargé depuis un CDN.
+
+L'import est direct : dès qu'un CSV est déposé, ses transactions sont
+enregistrées et le tableau de bord se met à jour immédiatement — il n'y a
+pas d'étape de validation manuelle séparée.
 
 ## Fonctionnement général
 
@@ -16,24 +21,25 @@ Chaque transaction est automatiquement classée en trois statuts :
   `Virement interne` (mouvements entre comptes du foyer) ; exclue des stats
 - **non_categorisee** — quand la catégorie commence par `A categoriser`
 
-## Les 5 onglets
+## Navigation
 
-1. **Import** — dépose un CSV pour Monsieur et/ou un CSV pour Madame. Aperçu
-   avant validation (lignes lues, répartition par statut, échantillon), puis
-   import définitif. Le dédoublonnage évite les doublons si tu réimportes
-   un fichier qui chevauche un import précédent.
-2. **Tableau de bord** — graphique en barres empilées des dépenses par mois
+La sidebar à gauche donne accès à 5 sections :
+
+1. **Tableau de bord** — graphique en barres empilées des dépenses par mois
    et par catégorie, et graphique en barres du cumulé par catégorie sur
-   toute la période.
-3. **Vue mensuelle** — tableau croisé catégories (lignes) × mois (colonnes),
+   toute la période. C'est la destination automatique après chaque import.
+2. **Vue mensuelle** — tableau croisé catégories (lignes) × mois (colonnes),
    avec totaux par ligne, par colonne et total général.
-4. **Virements** — liste des virements internes détectés, pour vérification.
-5. **Non catégorisées** — liste des opérations que la banque n'a pas su
+3. **Virements** — liste des virements internes détectés, pour vérification.
+4. **À catégoriser** — liste des opérations que la banque n'a pas su
    classer, pour information (à corriger directement dans l'espace bancaire
    si besoin).
+5. **Importer** — dépose un CSV pour Monsieur et/ou un CSV pour Madame
+   (clic ou glisser-déposer). Le dédoublonnage évite les doublons si tu
+   réimportes un fichier qui chevauche un import précédent.
 
-Un filtre **Monsieur / Madame / les deux** en haut de page s'applique à tous
-les onglets.
+Un filtre **Tous / Monsieur / Madame** dans la barre du haut s'applique à
+toutes les sections.
 
 ## Format de fichier attendu
 
@@ -77,14 +83,14 @@ navigateurs.)
 ## Structure du projet
 
 ```
-├── index.html          5 onglets (Import, Tableau de bord, Vue mensuelle, Virements, Non catégorisées)
+├── index.html          Sidebar + 5 sections (Tableau de bord, Vue mensuelle, Virements, À catégoriser, Importer)
 ├── css/
-│   └── style.css        Styles
+│   └── style.css        Styles (direction fintech : cartes blanches, accent indigo)
 ├── js/
 │   ├── storage.js       Persistance localStorage, dédoublonnage à l'import
 │   ├── csvParser.js     Lecture et interprétation du CSV bancaire
 │   ├── charts.js         Graphiques (Chart.js)
-│   └── app.js             Logique applicative et rendu des 5 onglets
+│   └── app.js             Logique applicative, import direct, navigation
 └── README.md
 ```
 

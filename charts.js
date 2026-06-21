@@ -9,9 +9,9 @@ const ChartsModule = {
   _parCategorie: null,
 
   palette: [
-    '#7c8b7a', '#a3866b', '#8a7ca8', '#c08a5c', '#b06a6a', '#6a8fb0',
-    '#4f7a5c', '#5c7a6f', '#9c7a9c', '#6f8a9c', '#bfa05c', '#7a9c8a',
-    '#9c6f6f', '#6f7a9c',
+    '#5B5FEF', '#12A35E', '#F5A524', '#E5484D', '#0EA5C4', '#D6589F',
+    '#7C5CFC', '#2DBE8B', '#FF8A4C', '#4F6BFF', '#C2410C', '#0D9488',
+    '#9333EA', '#65A30D',
   ],
 
   couleurPour(nom, index) {
@@ -57,15 +57,15 @@ const ChartsModule = {
         plugins: {
           legend: {
             position: 'bottom',
-            labels: { font: { family: "'IBM Plex Mono', monospace", size: 10 }, color: '#3b3530', boxWidth: 10, padding: 8 },
+            labels: { font: { family: "'Inter', sans-serif", size: 10 }, color: '#15182B', boxWidth: 10, padding: 8 },
           },
           tooltip: {
             callbacks: { label: (c) => `${c.dataset.label} : ${c.parsed.y.toFixed(2)} €` },
           },
         },
         scales: {
-          x: { stacked: true, ticks: { font: { family: "'IBM Plex Mono', monospace", size: 10 }, color: '#6b6258' }, grid: { display: false } },
-          y: { stacked: true, ticks: { font: { family: "'IBM Plex Mono', monospace", size: 10 }, color: '#6b6258' }, grid: { color: '#e6e1d6' } },
+          x: { stacked: true, ticks: { font: { family: "'Inter', sans-serif", size: 10 }, color: '#6B7088' }, grid: { display: false } },
+          y: { stacked: true, ticks: { font: { family: "'Inter', sans-serif", size: 10 }, color: '#6B7088' }, grid: { color: '#E7E9F1' } },
         },
       },
     });
@@ -104,8 +104,8 @@ const ChartsModule = {
           tooltip: { callbacks: { label: (c) => `${c.parsed.x.toFixed(2)} €` } },
         },
         scales: {
-          x: { ticks: { font: { family: "'IBM Plex Mono', monospace", size: 10 }, color: '#6b6258' }, grid: { color: '#e6e1d6' } },
-          y: { ticks: { font: { family: "'IBM Plex Mono', monospace", size: 11 }, color: '#3b3530' }, grid: { display: false } },
+          x: { ticks: { font: { family: "'Inter', sans-serif", size: 10 }, color: '#6B7088' }, grid: { color: '#E7E9F1' } },
+          y: { ticks: { font: { family: "'Inter', sans-serif", size: 11 }, color: '#15182B' }, grid: { display: false } },
         },
       },
     });

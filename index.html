@@ -3,165 +3,225 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Registre — Suivi de budget</title>
-<meta name="description" content="Suivi de budget à partir des relevés bancaires CSV : tableau de bord par catégorie, vue croisée mensuelle, virements et transactions non catégorisées.">
+<title>Pulse — Budget du foyer</title>
+<meta name="description" content="Suivi de budget à partir des relevés bancaires CSV : tableau de bord par catégorie, vue mensuelle, virements et transactions non catégorisées.">
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Source+Sans+3:wght@400;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 
 <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
 
-<header class="entete">
-  <div class="entete__inner">
-    <h1>Registre <span class="ledger-no">budget du foyer</span></h1>
-    <div class="entete__droite">
-      <select id="filtre-personne" aria-label="Filtrer par personne">
-        <option value="tous">Monsieur &amp; Madame</option>
-        <option value="monsieur">Monsieur</option>
-        <option value="madame">Madame</option>
-      </select>
+<div class="shell">
+
+  <!-- ============ Sidebar ============ -->
+  <aside class="sidebar">
+    <div class="sidebar__brand">
+      <span class="sidebar__mark">P</span>
+      <span class="sidebar__nom">Pulse</span>
     </div>
-  </div>
-  <nav class="tabs-principal" role="tablist">
-    <button class="tab-principal active" data-panel="import" role="tab">Import</button>
-    <button class="tab-principal" data-panel="dashboard" role="tab">Tableau de bord</button>
-    <button class="tab-principal" data-panel="croise" role="tab">Vue mensuelle</button>
-    <button class="tab-principal" data-panel="virements" role="tab">Virements <span class="badge cache" id="badge-virements">0</span></button>
-    <button class="tab-principal" data-panel="noncat" role="tab">Non catégorisées <span class="badge cache" id="badge-noncat">0</span></button>
-  </nav>
-</header>
 
-<main class="conteneur">
+    <nav class="sidebar__nav" role="tablist">
+      <button class="nav-item active" data-panel="dashboard" role="tab">
+        <svg viewBox="0 0 20 20" fill="none"><path d="M3 13.5h3v3.5H3v-3.5Zm5.5-6h3v9.5h-3v-9.5ZM14 8h3v9h-3V8Z" fill="currentColor"/></svg>
+        Tableau de bord
+      </button>
+      <button class="nav-item" data-panel="croise" role="tab">
+        <svg viewBox="0 0 20 20" fill="none"><rect x="3" y="3" width="14" height="14" rx="2" stroke="currentColor" stroke-width="1.6"/><path d="M3 8h14M8 3v14" stroke="currentColor" stroke-width="1.6"/></svg>
+        Vue mensuelle
+      </button>
+      <button class="nav-item" data-panel="virements" role="tab">
+        <svg viewBox="0 0 20 20" fill="none"><path d="M4 7h10M14 7l-3-3M14 7l-3 3M16 13H6M6 13l3-3M6 13l3 3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        Virements
+        <span class="nav-badge cache" id="badge-virements">0</span>
+      </button>
+      <button class="nav-item" data-panel="noncat" role="tab">
+        <svg viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="7" stroke="currentColor" stroke-width="1.6"/><path d="M10 6.5v4M10 13.2v.1" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+        À catégoriser
+        <span class="nav-badge cache" id="badge-noncat">0</span>
+      </button>
+      <button class="nav-item" data-panel="import" role="tab">
+        <svg viewBox="0 0 20 20" fill="none"><path d="M10 13V4M6.5 7.5 10 4l3.5 3.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 13.5v1.2a1.3 1.3 0 0 0 1.3 1.3h9.4a1.3 1.3 0 0 0 1.3-1.3v-1.2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+        Importer
+      </button>
+    </nav>
 
-  <!-- ============ Onglet 1 : Import ============ -->
-  <section class="panel-principal active" id="panel-import">
-    <div class="section">
-      <h2>Importer un relevé</h2>
-      <p class="intro">Fichier CSV exporté depuis l'espace bancaire (séparateur « ; »). Un import par personne, pour garder la trace de qui a dépensé quoi.</p>
+    <div class="sidebar__bas">
+      <button class="nav-item nav-item--danger" id="btn-reset">
+        <svg viewBox="0 0 20 20" fill="none"><path d="M4 6h12M8 6V4.5a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1V6m-7 0 .6 9.4a1.5 1.5 0 0 0 1.5 1.4h3.8a1.5 1.5 0 0 0 1.5-1.4L15 6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        Réinitialiser
+      </button>
+    </div>
+  </aside>
 
-      <div class="import-grid">
-        <div class="import-carte import-carte--monsieur">
-          <h3>Monsieur</h3>
-          <p>Relevé du compte de Monsieur.</p>
-          <div class="zone-upload">
-            <label class="btn-fichier" for="input-csv-monsieur">Choisir un fichier CSV</label>
-            <input type="file" id="input-csv-monsieur" accept=".csv,text/csv">
-            <span class="precision">Format banque (Caisse d'Épargne / BPCE et compatibles)</span>
-          </div>
+  <!-- ============ Contenu principal ============ -->
+  <div class="main">
+
+    <header class="topbar">
+      <div class="topbar__titre" id="topbar-titre">Tableau de bord</div>
+      <div class="topbar__droite">
+        <div class="segmente" id="filtre-personne" role="tablist">
+          <button class="segmente__item active" data-valeur="tous">Tous</button>
+          <button class="segmente__item" data-valeur="monsieur">Monsieur</button>
+          <button class="segmente__item" data-valeur="madame">Madame</button>
         </div>
-        <div class="import-carte import-carte--madame">
-          <h3>Madame</h3>
-          <p>Relevé du compte de Madame.</p>
-          <div class="zone-upload">
-            <label class="btn-fichier" for="input-csv-madame">Choisir un fichier CSV</label>
-            <input type="file" id="input-csv-madame" accept=".csv,text/csv">
-            <span class="precision">Format banque (Caisse d'Épargne / BPCE et compatibles)</span>
-          </div>
-        </div>
+        <button class="btn-accent" id="btn-importer-topbar">
+          <svg viewBox="0 0 20 20" fill="none"><path d="M10 13V4M6.5 7.5 10 4l3.5 3.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 13.5v1.2a1.3 1.3 0 0 0 1.3 1.3h9.4a1.3 1.3 0 0 0 1.3-1.3v-1.2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+          Importer un relevé
+        </button>
       </div>
+    </header>
 
-      <div id="import-apercu"></div>
-    </div>
+    <main class="contenu">
 
-    <div class="section">
-      <h2>Historique des imports</h2>
-      <div id="import-historique"></div>
-    </div>
+      <!-- ============ Tableau de bord ============ -->
+      <section class="panel-principal active" id="panel-dashboard">
 
-    <div class="section">
-      <h2>Données</h2>
-      <div class="io-card danger">
-        <h3>Réinitialiser</h3>
-        <p>Supprime toutes les transactions importées. Irréversible.</p>
-        <button id="btn-reset">Tout effacer</button>
-      </div>
-    </div>
-  </section>
-
-  <!-- ============ Onglet 2 : Tableau de bord ============ -->
-  <section class="panel-principal" id="panel-dashboard">
-    <div id="dashboard-vide" class="section">
-      <p class="vide">Aucune donnée à afficher. Importe un relevé dans l'onglet « Import » pour commencer.</p>
-    </div>
-
-    <div id="dashboard-contenu" class="cache">
-      <section class="resume-grid" aria-label="Résumé">
-        <div class="resume-cell">
-          <span class="resume-cell__label">Revenus</span>
-          <span class="resume-cell__valeur pos mono" id="dash-revenus">0,00 €</span>
+        <div id="dashboard-vide" class="etat-vide">
+          <div class="etat-vide__icone">
+            <svg viewBox="0 0 48 48" fill="none"><rect x="8" y="14" width="32" height="26" rx="3" stroke="currentColor" stroke-width="2"/><path d="M8 20h32" stroke="currentColor" stroke-width="2"/><path d="M16 28h6M16 33h10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M24 6v8M19 10l5-4 5 4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </div>
+          <h2>Aucune donnée pour le moment</h2>
+          <p>Importe un relevé bancaire pour faire vivre ton tableau de bord.</p>
+          <button class="btn-accent" id="btn-importer-vide">Importer un relevé</button>
         </div>
-        <div class="resume-cell">
-          <span class="resume-cell__label">Dépenses</span>
-          <span class="resume-cell__valeur neg mono" id="dash-depenses">0,00 €</span>
-        </div>
-        <div class="resume-cell">
-          <span class="resume-cell__label">Net</span>
-          <span class="resume-cell__valeur mono" id="dash-net">0,00 €</span>
-        </div>
-        <div class="resume-cell">
-          <span class="resume-cell__label">Mois couverts</span>
-          <span class="resume-cell__valeur mono" id="dash-nb-mois">0</span>
+
+        <div id="dashboard-contenu" class="cache">
+          <section class="kpi-grid">
+            <div class="kpi-carte">
+              <span class="kpi-carte__label">Revenus</span>
+              <span class="kpi-carte__valeur pos" id="dash-revenus">0,00 €</span>
+            </div>
+            <div class="kpi-carte">
+              <span class="kpi-carte__label">Dépenses</span>
+              <span class="kpi-carte__valeur neg" id="dash-depenses">0,00 €</span>
+            </div>
+            <div class="kpi-carte kpi-carte--accent">
+              <span class="kpi-carte__label">Solde net</span>
+              <span class="kpi-carte__valeur" id="dash-net">0,00 €</span>
+            </div>
+            <div class="kpi-carte">
+              <span class="kpi-carte__label">Mois couverts</span>
+              <span class="kpi-carte__valeur" id="dash-nb-mois">0</span>
+            </div>
+          </section>
+
+          <div class="grille-graphiques">
+            <section class="carte carte--large">
+              <div class="carte__entete">
+                <h3>Dépenses par mois</h3>
+                <p>Réparties par catégorie</p>
+              </div>
+              <div class="carte__corps chart-zone"><canvas id="chart-par-mois"></canvas></div>
+            </section>
+            <section class="carte">
+              <div class="carte__entete">
+                <h3>Cumulé par catégorie</h3>
+                <p>Sur toute la période</p>
+              </div>
+              <div class="carte__corps chart-zone"><canvas id="chart-par-categorie"></canvas></div>
+            </section>
+          </div>
         </div>
       </section>
 
-      <div class="deux-colonnes">
-        <section class="section">
-          <h2>Dépenses par mois et catégorie</h2>
-          <div class="chart-card"><canvas id="chart-par-mois"></canvas></div>
+      <!-- ============ Vue mensuelle ============ -->
+      <section class="panel-principal" id="panel-croise">
+        <section class="carte">
+          <div class="carte__entete">
+            <h3>Catégories × mois</h3>
+            <p>Total des dépenses par catégorie pour chaque mois disponible</p>
+          </div>
+          <div class="carte__corps" id="tableau-croise"></div>
         </section>
-        <section class="section">
-          <h2>Cumulé par catégorie</h2>
-          <div class="chart-card"><canvas id="chart-par-categorie"></canvas></div>
+      </section>
+
+      <!-- ============ Virements ============ -->
+      <section class="panel-principal" id="panel-virements">
+        <section class="carte">
+          <div class="carte__entete">
+            <h3>Virements internes</h3>
+            <p>Mouvements entre comptes du foyer, exclus des statistiques de dépenses</p>
+          </div>
+          <div class="carte__corps table-wrap">
+            <table>
+              <thead><tr><th>Date</th><th>Libellé</th><th>Personne</th><th>Détail</th><th class="al-droite">Montant</th></tr></thead>
+              <tbody id="virements-corps"></tbody>
+            </table>
+          </div>
         </section>
-      </div>
-    </div>
-  </section>
+      </section>
 
-  <!-- ============ Onglet 3 : Vue mensuelle (tableau croisé) ============ -->
-  <section class="panel-principal" id="panel-croise">
-    <div class="section">
-      <h2>Catégories × mois</h2>
-      <p class="intro">Total des dépenses par catégorie pour chaque mois disponible.</p>
-      <div id="tableau-croise"></div>
-    </div>
-  </section>
+      <!-- ============ Non catégorisées ============ -->
+      <section class="panel-principal" id="panel-noncat">
+        <section class="carte">
+          <div class="carte__entete">
+            <h3>Transactions à catégoriser</h3>
+            <p>Mouvements que la banque n'a pas su classer automatiquement</p>
+          </div>
+          <div class="carte__corps table-wrap">
+            <table>
+              <thead><tr><th>Date</th><th>Libellé</th><th>Personne</th><th>Détail</th><th class="al-droite">Montant</th></tr></thead>
+              <tbody id="noncat-corps"></tbody>
+            </table>
+          </div>
+        </section>
+      </section>
 
-  <!-- ============ Onglet 4 : Virements ============ -->
-  <section class="panel-principal" id="panel-virements">
-    <div class="section">
-      <h2>Virements internes</h2>
-      <p class="intro">Mouvements entre comptes du foyer, exclus des statistiques de dépenses.</p>
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th>Date</th><th>Libellé</th><th>Personne</th><th>Détail</th><th style="text-align:right">Montant</th></tr></thead>
-          <tbody id="virements-corps"></tbody>
-        </table>
-      </div>
-    </div>
-  </section>
+      <!-- ============ Import ============ -->
+      <section class="panel-principal" id="panel-import">
+        <div class="import-grid">
+          <section class="carte import-carte" data-personne-couleur="monsieur">
+            <div class="import-carte__entete">
+              <span class="import-carte__avatar">M</span>
+              <div>
+                <h3>Monsieur</h3>
+                <p>Relevé du compte de Monsieur</p>
+              </div>
+            </div>
+            <label class="zone-upload" for="input-csv-monsieur">
+              <svg viewBox="0 0 32 32" fill="none"><path d="M16 21V8M10 13.5 16 8l6 5.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M6 21.5v2A2.5 2.5 0 0 0 8.5 26h15a2.5 2.5 0 0 0 2.5-2.5v-2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+              <span class="zone-upload__texte">Glisse un CSV ou clique pour choisir</span>
+              <span class="zone-upload__precision">Export bancaire, séparateur «&nbsp;;&nbsp;»</span>
+            </label>
+            <input type="file" id="input-csv-monsieur" accept=".csv,text/csv" class="sr-only">
+          </section>
 
-  <!-- ============ Onglet 5 : Non catégorisées ============ -->
-  <section class="panel-principal" id="panel-noncat">
-    <div class="section">
-      <h2>Transactions non catégorisées</h2>
-      <p class="intro">Mouvements que la banque n'a pas su classer automatiquement. À corriger directement dans l'espace bancaire si besoin.</p>
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th>Date</th><th>Libellé</th><th>Personne</th><th>Détail</th><th style="text-align:right">Montant</th></tr></thead>
-          <tbody id="noncat-corps"></tbody>
-        </table>
-      </div>
-    </div>
-  </section>
+          <section class="carte import-carte" data-personne-couleur="madame">
+            <div class="import-carte__entete">
+              <span class="import-carte__avatar">M</span>
+              <div>
+                <h3>Madame</h3>
+                <p>Relevé du compte de Madame</p>
+              </div>
+            </div>
+            <label class="zone-upload" for="input-csv-madame">
+              <svg viewBox="0 0 32 32" fill="none"><path d="M16 21V8M10 13.5 16 8l6 5.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M6 21.5v2A2.5 2.5 0 0 0 8.5 26h15a2.5 2.5 0 0 0 2.5-2.5v-2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+              <span class="zone-upload__texte">Glisse un CSV ou clique pour choisir</span>
+              <span class="zone-upload__precision">Export bancaire, séparateur «&nbsp;;&nbsp;»</span>
+            </label>
+            <input type="file" id="input-csv-madame" accept=".csv,text/csv" class="sr-only">
+          </section>
+        </div>
 
-</main>
+        <div id="import-statut"></div>
 
-<footer class="pied">
-  Données stockées localement dans votre navigateur · rien n'est envoyé sur un serveur.
-</footer>
+        <section class="carte">
+          <div class="carte__entete">
+            <h3>Historique des imports</h3>
+          </div>
+          <div class="carte__corps" id="import-historique"></div>
+        </section>
+      </section>
+
+    </main>
+  </div>
+</div>
+
+<!-- Toast de confirmation -->
+<div class="toast" id="toast"></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
 <script src="js/storage.js"></script>

@@ -1,12 +1,20 @@
 /**
  * app.js
- * Logique applicative : import CSV, navigation par onglets, calculs et rendu.
+ * Logique applicative : import CSV (alimente directement le tableau de bord),
+ * navigation par panneaux, calculs et rendu.
  */
 
 const App = {
   state: null,
   filtrePersonne: 'tous', // 'tous' | 'monsieur' | 'madame'
-  fichierEnAttente: null, // {file, parseResult} avant validation de l'import
+
+  TITRES_PANEL: {
+    dashboard: 'Tableau de bord',
+    croise: 'Vue mensuelle',
+    virements: 'Virements',
+    noncat: 'À catégoriser',
+    import: 'Importer un relevé',
+  },
 
   init() {
     this.state = Store.load();
@@ -43,12 +51,19 @@ const App = {
     return txns;
   },
 
+  toast(message, type = 'succes') {
+    const el = document.getElementById('toast');
+    el.textContent = message;
+    el.classList.add('visible');
+    clearTimeout(this._toastTimer);
+    this._toastTimer = setTimeout(() => el.classList.remove('visible'), 3200);
+  },
+
   // ---------------------------------------------------------------------
   // Rendu général
   // ---------------------------------------------------------------------
 
   renderAll() {
-    this.renderFiltrePersonne();
     this.renderImportHistorique();
     this.renderDashboard();
     this.renderTableauCroise();
@@ -66,13 +81,8 @@ const App = {
     document.getElementById('badge-noncat').classList.toggle('cache', nbNc === 0);
   },
 
-  renderFiltrePersonne() {
-    const sel = document.getElementById('filtre-personne');
-    sel.value = this.filtrePersonne;
-  },
-
   // ---------------------------------------------------------------------
-  // Onglet 1 — Import
+  // Import — directement intégré, pas d'étape de confirmation séparée
   // ---------------------------------------------------------------------
 
   renderImportHistorique() {
@@ -83,122 +93,70 @@ const App = {
       return;
     }
     el.innerHTML = `
-      <table>
-        <thead><tr><th>Fichier</th><th>Personne</th><th>Lignes</th><th>Ajoutées</th><th>Doublons ignorés</th><th>Date d'import</th></tr></thead>
-        <tbody>
-          ${imports.map(imp => `
-            <tr>
-              <td class="mono">${this.escape(imp.nomFichier)}</td>
-              <td>${this.labelPersonne(imp.personne)}</td>
-              <td class="mono">${imp.nbLignes}</td>
-              <td class="mono pos">${imp.nbAjoutees}</td>
-              <td class="mono">${imp.nbDoublons}</td>
-              <td class="mono">${new Date(imp.date).toLocaleString('fr-FR')}</td>
-            </tr>
-          `).join('')}
-        </tbody>
-      </table>
-    `;
-  },
-
-  async onFichierChoisi(file, personne) {
-    const zoneApercu = document.getElementById('import-apercu');
-    zoneApercu.innerHTML = '<p class="vide">Lecture du fichier…</p>';
-    try {
-      const resultat = await CsvParser.parseFichier(file);
-
-      if (resultat.colonnesManquantes.length > 0) {
-        zoneApercu.innerHTML = `
-          <div class="alerte-bloc">
-            <strong>Format de fichier non reconnu.</strong>
-            <p>Colonnes attendues manquantes : ${resultat.colonnesManquantes.map(c => `<code>${this.escape(c)}</code>`).join(', ')}.</p>
-            <p>Vérifie qu'il s'agit bien d'un export CSV de relevé bancaire avec séparateur « ; ».</p>
-          </div>`;
-        this.fichierEnAttente = null;
-        return;
-      }
-
-      this.fichierEnAttente = { file, personne, resultat };
-      this.afficherApercuImport();
-    } catch (e) {
-      zoneApercu.innerHTML = `<div class="alerte-bloc"><strong>Erreur de lecture.</strong><p>${this.escape(e.message)}</p></div>`;
-      this.fichierEnAttente = null;
-    }
-  },
-
-  afficherApercuImport() {
-    const { file, personne, resultat } = this.fichierEnAttente;
-    const zoneApercu = document.getElementById('import-apercu');
-    const { transactions, erreurs } = resultat;
-
-    const parStatut = { normale: 0, virement_interne: 0, non_categorisee: 0 };
-    transactions.forEach(t => parStatut[t.statut]++);
-
-    const dates = transactions.map(t => t.date).sort();
-    const periode = dates.length ? `${this.formatDate(dates[0])} → ${this.formatDate(dates[dates.length - 1])}` : '—';
-
-    zoneApercu.innerHTML = `
-      <div class="apercu-resume">
-        <div><span class="apercu-resume__label">Fichier</span><span class="mono">${this.escape(file.name)}</span></div>
-        <div><span class="apercu-resume__label">Personne</span><span>${this.labelPersonne(personne)}</span></div>
-        <div><span class="apercu-resume__label">Période</span><span class="mono">${periode}</span></div>
-        <div><span class="apercu-resume__label">Lignes lues</span><span class="mono">${transactions.length}</span></div>
-        <div><span class="apercu-resume__label">Catégorisées</span><span class="mono pos">${parStatut.normale}</span></div>
-        <div><span class="apercu-resume__label">Virements internes</span><span class="mono">${parStatut.virement_interne}</span></div>
-        <div><span class="apercu-resume__label">Non catégorisées</span><span class="mono ${parStatut.non_categorisee ? 'neg' : ''}">${parStatut.non_categorisee}</span></div>
-      </div>
-      ${erreurs.length ? `<p class="avertissement">${erreurs.length} ligne(s) ignorée(s) (format imprévu).</p>` : ''}
-      <div class="table-wrap apercu-table">
+      <div class="table-wrap">
         <table>
-          <thead><tr><th>Date</th><th>Libellé</th><th>Catégorie</th><th style="text-align:right">Montant</th></tr></thead>
+          <thead><tr><th>Fichier</th><th>Personne</th><th>Lignes</th><th>Ajoutées</th><th>Doublons ignorés</th><th>Date d'import</th></tr></thead>
           <tbody>
-            ${transactions.slice(0, 8).map(t => `
+            ${imports.map(imp => `
               <tr>
-                <td class="mono">${this.formatDate(t.date)}</td>
-                <td>${this.escape(t.libelle)}</td>
-                <td><span class="tag" style="--tag-color:${ChartsModule.couleurPour(t.categorie, 0)}">${this.escape(t.categorie)}</span></td>
-                <td class="mono montant ${t.sens === 'credit' ? 'pos' : 'neg'}">${t.sens === 'credit' ? '+' : '−'}${this.formatMontant(t.montant).replace('-', '')}</td>
+                <td class="mono">${this.escape(imp.nomFichier)}</td>
+                <td>${this.labelPersonne(imp.personne)}</td>
+                <td class="mono">${imp.nbLignes}</td>
+                <td class="mono pos">${imp.nbAjoutees}</td>
+                <td class="mono">${imp.nbDoublons}</td>
+                <td class="mono">${new Date(imp.date).toLocaleString('fr-FR')}</td>
               </tr>
             `).join('')}
           </tbody>
         </table>
-        ${transactions.length > 8 ? `<p class="apercu-plus">… et ${transactions.length - 8} autre(s) ligne(s).</p>` : ''}
-      </div>
-      <div class="modale-actions">
-        <button type="button" class="btn-secondaire" id="btn-annuler-import">Annuler</button>
-        <button type="button" class="btn-principal" id="btn-confirmer-import">Importer ${transactions.length} transaction(s)</button>
       </div>
     `;
-
-    document.getElementById('btn-annuler-import').addEventListener('click', () => this.annulerImport());
-    document.getElementById('btn-confirmer-import').addEventListener('click', () => this.confirmerImport());
   },
 
-  annulerImport() {
-    this.fichierEnAttente = null;
-    document.getElementById('import-apercu').innerHTML = '';
-    document.getElementById('input-csv-monsieur').value = '';
-    document.getElementById('input-csv-madame').value = '';
-  },
+  async onFichierChoisi(file, personne) {
+    const zoneStatut = document.getElementById('import-statut');
+    zoneStatut.innerHTML = `<div class="alerte-bloc succes"><strong>Lecture du fichier…</strong><p>${this.escape(file.name)}</p></div>`;
 
-  confirmerImport() {
-    if (!this.fichierEnAttente) return;
-    const { file, personne, resultat } = this.fichierEnAttente;
-    const { ajoutees, doublons } = Store.importerTransactions(file.name, personne, resultat.transactions);
-    this.state = Store.getState();
-    this.fichierEnAttente = null;
-    document.getElementById('import-apercu').innerHTML = `
-      <div class="alerte-bloc succes">
-        <strong>Import terminé.</strong>
-        <p>${ajoutees} transaction(s) ajoutée(s)${doublons ? `, ${doublons} doublon(s) ignoré(s)` : ''}.</p>
-      </div>`;
-    document.getElementById('input-csv-monsieur').value = '';
-    document.getElementById('input-csv-madame').value = '';
-    this.renderAll();
+    try {
+      const resultat = await CsvParser.parseFichier(file);
+
+      if (resultat.colonnesManquantes.length > 0) {
+        zoneStatut.innerHTML = `
+          <div class="alerte-bloc erreur">
+            <strong>Format de fichier non reconnu</strong>
+            <p>Colonnes manquantes : ${resultat.colonnesManquantes.map(c => `<code>${this.escape(c)}</code>`).join(', ')}. Vérifie qu'il s'agit d'un export CSV bancaire avec séparateur « ; ».</p>
+          </div>`;
+        return;
+      }
+
+      if (resultat.transactions.length === 0) {
+        zoneStatut.innerHTML = `<div class="alerte-bloc erreur"><strong>Aucune transaction lisible</strong><p>Le fichier ne contient aucune ligne exploitable.</p></div>`;
+        return;
+      }
+
+      // Import direct : pas d'étape de confirmation manuelle, on alimente le tableau de bord tout de suite
+      const { ajoutees, doublons } = Store.importerTransactions(file.name, personne, resultat.transactions);
+      this.state = Store.getState();
+
+      const message = doublons > 0
+        ? `${ajoutees} transaction(s) ajoutée(s) · ${doublons} doublon(s) déjà connus ignoré(s)`
+        : `${ajoutees} transaction(s) ajoutée(s) avec succès`;
+
+      zoneStatut.innerHTML = `<div class="alerte-bloc succes"><strong>Import réussi — ${this.labelPersonne(personne)}</strong><p>${message}</p></div>`;
+
+      this.renderAll();
+      this.toast(`${ajoutees} transaction(s) importée(s) pour ${this.labelPersonne(personne).toLowerCase()}`);
+
+      // Bascule automatique vers le tableau de bord pour voir le résultat immédiatement
+      setTimeout(() => this.allerVersPanel('dashboard'), 700);
+
+    } catch (e) {
+      zoneStatut.innerHTML = `<div class="alerte-bloc erreur"><strong>Erreur de lecture</strong><p>${this.escape(e.message)}</p></div>`;
+    }
   },
 
   // ---------------------------------------------------------------------
-  // Onglet 2 — Tableau de bord
+  // Tableau de bord
   // ---------------------------------------------------------------------
 
   moisDisponibles(txns) {
@@ -212,46 +170,38 @@ const App = {
     const mois = this.moisDisponibles(txns);
     const categories = [...new Set(txns.map(t => t.categorie))].sort();
 
-    // matrice categorie -> mois -> montant
     const matrice = {};
     categories.forEach(c => matrice[c] = {});
     txns.forEach(t => {
       matrice[t.categorie][t.date.slice(0, 7)] = (matrice[t.categorie][t.date.slice(0, 7)] || 0) + t.montant;
     });
 
-    // totaux cumulés par catégorie
     const totauxCategorie = {};
     categories.forEach(c => {
       totauxCategorie[c] = Object.values(matrice[c]).reduce((s, v) => s + v, 0);
     });
 
-    // résumé chiffré
     const totalDepenses = Object.values(totauxCategorie).reduce((s, v) => s + v, 0);
     const revenus = this.transactionsNormales().filter(t => t.sens === 'credit').reduce((s, t) => s + t.montant, 0);
 
     document.getElementById('dash-revenus').textContent = this.formatMontant(revenus);
     document.getElementById('dash-depenses').textContent = this.formatMontant(totalDepenses);
     const net = revenus - totalDepenses;
-    const netEl = document.getElementById('dash-net');
-    netEl.textContent = this.formatMontant(net);
-    netEl.classList.toggle('neg', net < 0);
-    netEl.classList.toggle('pos', net >= 0);
+    document.getElementById('dash-net').textContent = this.formatMontant(net);
     document.getElementById('dash-nb-mois').textContent = mois.length;
 
-    if (mois.length === 0) {
-      document.getElementById('dashboard-vide').classList.remove('cache');
-      document.getElementById('dashboard-contenu').classList.add('cache');
-      return;
-    }
-    document.getElementById('dashboard-vide').classList.add('cache');
-    document.getElementById('dashboard-contenu').classList.remove('cache');
+    const aDesDonnees = this.state.transactions.length > 0;
+    document.getElementById('dashboard-vide').classList.toggle('cache', aDesDonnees);
+    document.getElementById('dashboard-contenu').classList.toggle('cache', !aDesDonnees);
+
+    if (!aDesDonnees) return;
 
     ChartsModule.renderParMois('chart-par-mois', mois, categories, matrice);
     ChartsModule.renderParCategorie('chart-par-categorie', totauxCategorie);
   },
 
   // ---------------------------------------------------------------------
-  // Onglet 3 — Tableau croisé (catégories x mois)
+  // Vue mensuelle (tableau croisé)
   // ---------------------------------------------------------------------
 
   renderTableauCroise() {
@@ -259,7 +209,7 @@ const App = {
     const el = document.getElementById('tableau-croise');
 
     if (txns.length === 0) {
-      el.innerHTML = '<p class="vide">Aucune dépense catégorisée pour le moment. Importe un relevé dans l\'onglet Import.</p>';
+      el.innerHTML = '<p class="vide">Aucune dépense catégorisée pour le moment. Importe un relevé pour commencer.</p>';
       return;
     }
 
@@ -302,7 +252,7 @@ const App = {
   },
 
   // ---------------------------------------------------------------------
-  // Onglet 4 — Virements internes
+  // Virements internes
   // ---------------------------------------------------------------------
 
   renderVirements() {
@@ -328,7 +278,7 @@ const App = {
   },
 
   // ---------------------------------------------------------------------
-  // Onglet 5 — Non catégorisées
+  // Non catégorisées
   // ---------------------------------------------------------------------
 
   renderNonCategorisees() {
@@ -338,7 +288,7 @@ const App = {
     txns = [...txns].sort((a, b) => b.date.localeCompare(a.date));
 
     if (txns.length === 0) {
-      el.innerHTML = '<tr><td colspan="5" class="vide">Aucune transaction non catégorisée. 👍</td></tr>';
+      el.innerHTML = '<tr><td colspan="5" class="vide">Aucune transaction à catégoriser.</td></tr>';
       return;
     }
 
@@ -354,23 +304,38 @@ const App = {
   },
 
   // ---------------------------------------------------------------------
+  // Navigation
+  // ---------------------------------------------------------------------
+
+  allerVersPanel(panel) {
+    document.querySelectorAll('.nav-item[data-panel]').forEach(item => {
+      item.classList.toggle('active', item.dataset.panel === panel);
+    });
+    document.querySelectorAll('.panel-principal').forEach(p => {
+      p.classList.toggle('active', p.id === 'panel-' + panel);
+    });
+    document.getElementById('topbar-titre').textContent = this.TITRES_PANEL[panel] || '';
+  },
+
+  // ---------------------------------------------------------------------
   // Événements
   // ---------------------------------------------------------------------
 
   bindEvents() {
-    // Onglets
-    document.querySelectorAll('.tab-principal').forEach(tab => {
-      tab.addEventListener('click', () => {
-        document.querySelectorAll('.tab-principal').forEach(t => t.classList.remove('active'));
-        document.querySelectorAll('.panel-principal').forEach(p => p.classList.remove('active'));
-        tab.classList.add('active');
-        document.getElementById('panel-' + tab.dataset.panel).classList.add('active');
-      });
+    document.querySelectorAll('.nav-item[data-panel]').forEach(item => {
+      item.addEventListener('click', () => this.allerVersPanel(item.dataset.panel));
     });
 
-    document.getElementById('filtre-personne').addEventListener('change', (e) => {
-      this.filtrePersonne = e.target.value;
-      this.renderAll();
+    document.getElementById('btn-importer-topbar').addEventListener('click', () => this.allerVersPanel('import'));
+    document.getElementById('btn-importer-vide').addEventListener('click', () => this.allerVersPanel('import'));
+
+    document.querySelectorAll('#filtre-personne .segmente__item').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('#filtre-personne .segmente__item').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        this.filtrePersonne = btn.dataset.valeur;
+        this.renderAll();
+      });
     });
 
     document.getElementById('input-csv-monsieur').addEventListener('change', (e) => {
@@ -378,6 +343,19 @@ const App = {
     });
     document.getElementById('input-csv-madame').addEventListener('change', (e) => {
       if (e.target.files[0]) this.onFichierChoisi(e.target.files[0], 'madame');
+    });
+
+    // Glisser-déposer sur les zones d'upload
+    [['input-csv-monsieur', 'monsieur'], ['input-csv-madame', 'madame']].forEach(([inputId, personne]) => {
+      const input = document.getElementById(inputId);
+      const zone = input.closest('.import-carte').querySelector('.zone-upload');
+      ['dragover', 'dragleave', 'drop'].forEach(evt => {
+        zone.addEventListener(evt, (e) => e.preventDefault());
+      });
+      zone.addEventListener('drop', (e) => {
+        const file = e.dataTransfer.files[0];
+        if (file) this.onFichierChoisi(file, personne);
+      });
     });
 
     document.getElementById('btn-reset').addEventListener('click', () => this.confirmerReset());
@@ -388,6 +366,7 @@ const App = {
     Store.resetAll();
     this.state = Store.getState();
     this.renderAll();
+    this.toast('Toutes les données ont été effacées.');
   },
 };
 
