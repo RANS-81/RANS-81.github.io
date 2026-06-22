@@ -358,6 +358,14 @@ button { font-family: inherit; }
 }
 .mini-chart-zone { height: 140px; }
 
+/* Tableau bilan annuel */
+.table-bilan { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+.table-bilan th, .table-bilan td { padding: 0.4em 0.55em; text-align: right; white-space: nowrap; }
+.table-bilan th:first-child, .table-bilan td:first-child { text-align: left; }
+.table-bilan thead th { background: var(--fond); color: var(--texte-att); font-weight: 600; border-bottom: 2px solid var(--bordure); }
+.table-bilan tbody tr:hover { background: var(--fond); }
+.table-bilan tbody td { border-bottom: 1px solid var(--bordure); }
+
 /* ---------- Modal détail ---------- */
 .modal-fond {
   position: fixed; inset: 0; background: rgba(21,24,43,.45);
