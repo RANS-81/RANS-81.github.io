@@ -12,6 +12,7 @@ const App = {
     dashboard: 'Tableau de bord',
     croise: 'Vue mensuelle',
     analyses: 'Analyses',
+    assistant: 'Assistant IA',
     virements: 'Virements',
     noncat: 'À catégoriser',
     import: 'Importer un relevé',
@@ -527,6 +528,7 @@ const App = {
     document.getElementById('btn-importer-vide').addEventListener('click', () => this.allerVersPanel('import'));
     document.getElementById('btn-importer-analyses')?.addEventListener('click', () => this.allerVersPanel('import'));
     document.getElementById('btn-export-croise')?.addEventListener('click', () => this.exportCroiseCSV());
+    this.initAssistant();
 
     document.querySelectorAll('#filtre-personne .segmente__item').forEach(btn => {
       btn.addEventListener('click', () => {
@@ -572,6 +574,103 @@ const App = {
     this.state = Store.getState();
     this.renderAll();
     this.toast('Toutes les données ont été effacées.');
+  },
+
+  // ---------------------------------------------------------------------
+  // Assistant IA — générateur de prompt contextuel
+  // ---------------------------------------------------------------------
+
+  SUGGESTIONS: [
+    'Quelles catégories ont le plus augmenté ces 3 derniers mois ?',
+    'Quel est mon taux d\'épargne moyen sur la période ?',
+    'Quels mois ont un solde négatif et pourquoi ?',
+    'Quelles dépenses pourrais-je réduire pour améliorer mon solde ?',
+    'Compare mes revenus et dépenses par trimestre.',
+  ],
+
+  initAssistant() {
+    const chips = document.getElementById('assistant-chips');
+    if (!chips) return;
+    chips.innerHTML = this.SUGGESTIONS.map(s =>
+      `<button class="assistant-chip">${s}</button>`
+    ).join('');
+    chips.querySelectorAll('.assistant-chip').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.getElementById('assistant-question').value = btn.textContent;
+      });
+    });
+    document.getElementById('btn-assistant-copier')?.addEventListener('click', () => this.copierPrompt());
+  },
+
+  construireContexte() {
+    const txns = this.transactionsNormales();
+    if (txns.length === 0) return '(Aucune donnée disponible)';
+
+    const dep = txns.filter(t => t.sens === 'debit');
+    const rev = txns.filter(t => t.sens === 'credit');
+
+    const totalDep = dep.reduce((s, t) => s + t.montant, 0);
+    const totalRev = rev.reduce((s, t) => s + t.montant, 0);
+    const mois = this.moisDisponibles(dep.concat(rev));
+
+    // Totaux par catégorie de dépenses
+    const parCat = {};
+    dep.forEach(t => { parCat[t.categorie] = (parCat[t.categorie] || 0) + t.montant; });
+    const lignesCat = Object.entries(parCat)
+      .sort((a, b) => b[1] - a[1])
+      .map(([c, v]) => `  - ${c} : ${this.formatMontant(v)}`)
+      .join('\n');
+
+    // Bilan mensuel
+    const bilanMois = {};
+    txns.forEach(t => {
+      const m = t.date.slice(0, 7);
+      if (!bilanMois[m]) bilanMois[m] = { rev: 0, dep: 0 };
+      if (t.sens === 'credit') bilanMois[m].rev += t.montant;
+      else bilanMois[m].dep += t.montant;
+    });
+    const lignesMois = mois.map(m => {
+      const b = bilanMois[m] || { rev: 0, dep: 0 };
+      const net = b.rev - b.dep;
+      return `  - ${ChartsModule.libelleMoisCourt(m)} : revenus ${this.formatMontant(b.rev)}, dépenses ${this.formatMontant(b.dep)}, solde ${net >= 0 ? '+' : ''}${this.formatMontant(Math.abs(net))}`;
+    }).join('\n');
+
+    return `## Données financières du foyer (période : ${ChartsModule.libelleMoisCourt(mois[0])} → ${ChartsModule.libelleMoisCourt(mois[mois.length - 1])})
+
+### Résumé global
+- Revenus totaux : ${this.formatMontant(totalRev)}
+- Dépenses totales : ${this.formatMontant(totalDep)}
+- Solde net : ${this.formatMontant(totalRev - totalDep)}
+- Nombre de mois : ${mois.length}
+- Filtre actif : ${this.filtrePersonne === 'tous' ? 'Tous (foyer complet)' : this.filtrePersonne}
+
+### Dépenses par catégorie
+${lignesCat}
+
+### Bilan mensuel
+${lignesMois}`;
+  },
+
+  copierPrompt() {
+    const question = document.getElementById('assistant-question')?.value.trim();
+    const contexte = this.construireContexte();
+    const prompt = question
+      ? `${question}\n\n---\n${contexte}`
+      : contexte;
+
+    // Afficher aperçu
+    const apercu = document.getElementById('assistant-apercu');
+    const apercuWrap = document.getElementById('assistant-apercu-wrap');
+    if (apercu) apercu.textContent = prompt;
+    apercuWrap?.classList.remove('cache');
+
+    navigator.clipboard.writeText(prompt).then(() => {
+      const ok = document.getElementById('assistant-copie-ok');
+      ok?.classList.remove('cache');
+      setTimeout(() => ok?.classList.add('cache'), 3000);
+    }).catch(() => {
+      this.toast('Copie automatique non disponible — sélectionne le texte manuellement.', 'erreur');
+    });
   },
 };
 
