@@ -232,6 +232,8 @@ const App = {
       const txns = credits.filter(t => t.categorie === cat);
       this.ouvrirModal(cat, txns);
     });
+
+    this.renderBilanAnnuel();
   },
 
   ouvrirModal(titre, txns) {
@@ -257,6 +259,52 @@ const App = {
         </div>`;
     }
     document.getElementById('modal-detail').classList.remove('cache');
+  },
+
+  renderBilanAnnuel() {
+    const el = document.getElementById('dash-bilan-annuel');
+    if (!el) return;
+    const txns = this.transactionsNormales();
+    if (txns.length === 0) { el.innerHTML = ''; return; }
+
+    const MOIS = ['Jan','Fév','Mar','Avr','Mai','Jun','Jul','Aoû','Sep','Oct','Nov','Déc'];
+
+    // Construire une map { année: { mois (0-11): { rev, dep } } }
+    const data = {};
+    txns.forEach(t => {
+      const d = new Date(t.date);
+      const an = d.getFullYear();
+      const mo = d.getMonth();
+      if (!data[an]) data[an] = {};
+      if (!data[an][mo]) data[an][mo] = { rev: 0, dep: 0 };
+      if (t.sens === 'credit') data[an][mo].rev += t.montant;
+      else data[an][mo].dep += t.montant;
+    });
+
+    const annees = Object.keys(data).map(Number).sort();
+
+    let html = '<table class="table-bilan"><thead><tr><th>Année</th>';
+    MOIS.forEach(m => html += `<th class="mono">${m}</th>`);
+    html += '<th class="mono total-col">Total</th></tr></thead><tbody>';
+
+    annees.forEach(an => {
+      let totalAn = 0;
+      html += `<tr><td><b>${an}</b></td>`;
+      for (let mo = 0; mo < 12; mo++) {
+        const cell = data[an][mo];
+        if (!cell) {
+          html += '<td class="mono cellule-vide">—</td>';
+        } else {
+          const net = cell.rev - cell.dep;
+          totalAn += net;
+          html += `<td class="mono ${net >= 0 ? 'pos' : 'neg'}">${net >= 0 ? '+' : ''}${this.formatMontant(Math.abs(net)).replace(' €','')}</td>`;
+        }
+      }
+      html += `<td class="mono total-col ${totalAn >= 0 ? 'pos' : 'neg'}">${totalAn >= 0 ? '+' : ''}${this.formatMontant(Math.abs(totalAn))}</td></tr>`;
+    });
+
+    html += '</tbody></table>';
+    el.innerHTML = html;
   },
 
   // ---------------------------------------------------------------------
