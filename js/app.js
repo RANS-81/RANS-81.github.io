@@ -18,8 +18,8 @@ const App = {
     import: 'Importer un relevé',
   },
 
-  init() {
-    this.state = Store.load();
+  async init() {
+    this.state = await Store.load();
     this.bindEvents();
     this.renderAll();
   },
@@ -138,8 +138,8 @@ const App = {
       }
 
       // Import direct : pas d'étape de confirmation manuelle, on alimente le tableau de bord tout de suite
-      const { ajoutees, doublons } = Store.importerTransactions(file.name, personne, resultat.transactions);
-      this.state = Store.getState();
+      const { ajoutees, doublons } = await Store.importerTransactions(file.name, personne, resultat.transactions);
+      this.state = await Store.load();
 
       const message = doublons > 0
         ? `${ajoutees} transaction(s) ajoutée(s) · ${doublons} doublon(s) déjà connus ignoré(s)`
@@ -568,9 +568,9 @@ const App = {
     });
   },
 
-  confirmerReset() {
+  async confirmerReset() {
     if (!confirm('Cela supprime définitivement toutes les transactions importées. Continuer ?')) return;
-    Store.resetAll();
+    await Store.resetAll();
     this.state = Store.getState();
     this.renderAll();
     this.toast('Toutes les données ont été effacées.');
@@ -675,14 +675,12 @@ ${lignesMois}`;
 };
 
 document.addEventListener('DOMContentLoaded', () => {
-  try {
-    App.init();
-  } catch(e) {
+  App.init().catch(e => {
     document.body.insertAdjacentHTML('afterbegin',
       `<div style="background:#fde;border:2px solid #c00;padding:1rem 1.5rem;font-family:monospace;font-size:13px;position:fixed;top:0;left:0;right:0;z-index:9999">
         <b>Erreur JS :</b> ${e.message}<br><small>${e.stack?.split('\n')[1] || ''}</small>
       </div>`);
-  }
+  });
 });
 
 window.addEventListener('error', (e) => {
