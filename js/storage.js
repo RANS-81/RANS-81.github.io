@@ -33,7 +33,7 @@
  *   );
  */
 
-const SUPABASE_URL = 'https://XXXXXXXXXXXXXXXX.supabase.co';  // ← remplacer
+const SUPABASE_URL = 'https://RANS-81.supabase.co'; 
 const SUPABASE_ANON_KEY = 'VOTRE_ANON_KEY';                   // ← remplacer
 
 const _db = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
