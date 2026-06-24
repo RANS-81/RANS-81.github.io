@@ -33,10 +33,12 @@
  *   );
  */
 
-const SUPABASE_URL = 'https://yhpepxauruozjruerglm.supabase.co'; 
-const SUPABASE_ANON_KEY = 'sb_publishable_rJ0LZ5dqBhsShTLfm-Vd5w_ARdFAuX_';                   // ← remplacer
+const SUPABASE_URL = 'https://XXXXXXXXXXXXXXXX.supabase.co';  // ← remplacer
+const SUPABASE_ANON_KEY = 'VOTRE_ANON_KEY';                   // ← remplacer
 
-const _db = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const _db = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+  auth: { persistSession: true, autoRefreshToken: true },
+});
 
 function uid(prefix) {
   return prefix + '_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
