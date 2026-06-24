@@ -19,6 +19,47 @@ const App = {
   },
 
   async init() {
+    await this.verifierSession();
+  },
+
+  async verifierSession() {
+    const { data: { session } } = await _db.getSession();
+    if (!session) {
+      this.afficherLogin();
+      return;
+    }
+    this.demarrerApp(session.user);
+  },
+
+  afficherLogin() {
+    document.getElementById('ecran-login').classList.remove('cache');
+    document.querySelector('.shell').classList.add('cache');
+    const form = document.getElementById('form-login');
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const email = document.getElementById('login-email').value.trim();
+      const mdp = document.getElementById('login-mdp').value;
+      const btn = document.getElementById('btn-login');
+      const erreur = document.getElementById('login-erreur');
+      btn.disabled = true;
+      btn.textContent = 'Connexion…';
+      erreur.classList.add('cache');
+      const { data, error } = await _db.auth.signInWithPassword({ email, password: mdp });
+      if (error) {
+        erreur.textContent = 'Email ou mot de passe incorrect.';
+        erreur.classList.remove('cache');
+        btn.disabled = false;
+        btn.textContent = 'Se connecter';
+        return;
+      }
+      document.getElementById('ecran-login').classList.add('cache');
+      this.demarrerApp(data.user);
+    });
+  },
+
+  async demarrerApp(user) {
+    document.querySelector('.shell').classList.remove('cache');
+    document.getElementById('sidebar-utilisateur').textContent = user.email;
     this.state = await Store.load();
     this.bindEvents();
     this.renderAll();
@@ -560,6 +601,11 @@ const App = {
     });
 
     document.getElementById('btn-reset').addEventListener('click', () => this.confirmerReset());
+
+    document.getElementById('btn-logout').addEventListener('click', async () => {
+      await _db.auth.signOut();
+      location.reload();
+    });
 
     document.getElementById('modal-fermer')?.addEventListener('click', () =>
       document.getElementById('modal-detail').classList.add('cache'));
