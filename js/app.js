@@ -23,7 +23,7 @@ const App = {
   },
 
   async verifierSession() {
-    const { data: { session } } = await _db.getSession();
+    const { data: { session } } = await _db.auth.getSession();
     if (!session) {
       this.afficherLogin();
       return;
