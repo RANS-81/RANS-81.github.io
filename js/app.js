@@ -19,8 +19,9 @@ const App = {
   },
 
   async init() {
-    await this.verifierSession();
-  },
+  this.bindEvents();              // ← fix : listener login attaché AVANT tout await
+  await this.verifierSession();
+},
 
   async verifierSession() {
     const { data: { session } } = await _db.auth.getSession();
