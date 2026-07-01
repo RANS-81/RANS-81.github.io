@@ -19,50 +19,39 @@ const App = {
   },
 
   async init() {
-  this.bindEvents();              // ← fix : listener login attaché AVANT tout await
-  await this.verifierSession();
-},
-
-  async verifierSession() {
-    const { data: { session } } = await _db.auth.getSession();
-    if (!session) {
-      this.afficherLogin();
-      return;
-    }
-    this.demarrerApp(session.user);
+    this.bindEvents();       // listeners attachés en premier, y compris le form login
+    await this.verifierSession();
   },
 
-  afficherLogin() {
-    document.getElementById('ecran-login').classList.remove('cache');
-    document.querySelector('.shell').classList.add('cache');
-    const form = document.getElementById('form-login');
-    form.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const email = document.getElementById('login-email').value.trim();
-      const mdp = document.getElementById('login-mdp').value;
-      const btn = document.getElementById('btn-login');
-      const erreur = document.getElementById('login-erreur');
-      btn.disabled = true;
-      btn.textContent = 'Connexion…';
-      erreur.classList.add('cache');
-      const { data, error } = await _db.auth.signInWithPassword({ email, password: mdp });
-      if (error) {
-        erreur.textContent = 'Email ou mot de passe incorrect.';
-        erreur.classList.remove('cache');
-        btn.disabled = false;
-        btn.textContent = 'Se connecter';
+  async verifierSession() {
+    try {
+      const resp = await _db.auth.getSession();
+      const session = resp?.data?.session ?? null;
+      if (!session) {
+        this._montrerLogin();
         return;
       }
-      document.getElementById('ecran-login').classList.add('cache');
-      this.demarrerApp(data.user);
-    });
+      await this.demarrerApp(session.user);
+    } catch(e) {
+      this._montrerLogin('Erreur de connexion au serveur : ' + e.message);
+    }
+  },
+
+  _montrerLogin(msgErreur) {
+    document.getElementById('ecran-login').classList.remove('cache');
+    document.querySelector('.shell').classList.add('cache');
+    if (msgErreur) {
+      const errEl = document.getElementById('login-erreur');
+      errEl.textContent = msgErreur;
+      errEl.classList.remove('cache');
+    }
   },
 
   async demarrerApp(user) {
+    document.getElementById('ecran-login').classList.add('cache');
     document.querySelector('.shell').classList.remove('cache');
     document.getElementById('sidebar-utilisateur').textContent = user.email;
     this.state = await Store.load();
-    this.bindEvents();
     this.renderAll();
   },
 
@@ -562,6 +551,28 @@ const App = {
   // ---------------------------------------------------------------------
 
   bindEvents() {
+    // Formulaire de login
+    document.getElementById('form-login').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const email = document.getElementById('login-email').value.trim();
+      const mdp = document.getElementById('login-mdp').value;
+      const btn = document.getElementById('btn-login');
+      const errEl = document.getElementById('login-erreur');
+      btn.disabled = true;
+      btn.textContent = 'Connexion…';
+      errEl.classList.add('cache');
+      try {
+        const { data, error } = await _db.auth.signInWithPassword({ email, password: mdp });
+        if (error) throw new Error(error.message);
+        await this.demarrerApp(data.user);
+      } catch(e) {
+        errEl.textContent = e.message || 'Email ou mot de passe incorrect.';
+        errEl.classList.remove('cache');
+        btn.disabled = false;
+        btn.textContent = 'Se connecter';
+      }
+    });
+
     document.querySelectorAll('.nav-item[data-panel]').forEach(item => {
       item.addEventListener('click', () => this.allerVersPanel(item.dataset.panel));
     });
