@@ -75,16 +75,29 @@ function _impFromRow(r) {
 const Store = {
   _state: { transactions: [], imports: [] },
 
+  async _fetchAll(table, order = 'date') {
+    const PAGE = 1000;
+    let all = [], from = 0, done = false;
+    while (!done) {
+      const { data, error } = await _db.from(table).select('*')
+        .order(order, { ascending: false })
+        .range(from, from + PAGE - 1);
+      if (error) throw new Error(`Erreur Supabase (${table}) : ` + error.message);
+      all = all.concat(data || []);
+      done = !data || data.length < PAGE;
+      from += PAGE;
+    }
+    return all;
+  },
+
   async load() {
-    const [{ data: txns, error: e1 }, { data: imps, error: e2 }] = await Promise.all([
-      _db.from('transactions').select('*').order('date', { ascending: false }).limit(100000),
-      _db.from('imports').select('*').order('date', { ascending: false }),
+    const [txns, imps] = await Promise.all([
+      this._fetchAll('transactions', 'date'),
+      this._fetchAll('imports', 'date'),
     ]);
-    if (e1) throw new Error('Erreur Supabase (transactions) : ' + e1.message);
-    if (e2) throw new Error('Erreur Supabase (imports) : ' + e2.message);
     this._state = {
-      transactions: (txns || []).map(_txnFromRow),
-      imports: (imps || []).map(_impFromRow),
+      transactions: txns.map(_txnFromRow),
+      imports: imps.map(_impFromRow),
     };
     return this._state;
   },
