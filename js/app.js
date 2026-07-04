@@ -556,25 +556,37 @@ const App = {
 
   bindEvents() {
     // Formulaire de login
-    document.getElementById('form-login').addEventListener('submit', async (e) => {
-      e.preventDefault();
+    const formLogin = document.getElementById('form-login');
+    const doLogin = async () => {
       const email = document.getElementById('login-email').value.trim();
       const mdp = document.getElementById('login-mdp').value;
       const btn = document.getElementById('btn-login');
       const errEl = document.getElementById('login-erreur');
+      if (!email || !mdp) return;
       btn.disabled = true;
       btn.textContent = 'Connexion…';
       errEl.classList.add('cache');
       try {
-        const { data, error } = await _db.auth.signInWithPassword({ email, password: mdp });
+        const timeout = new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('Délai dépassé — vérifie ta connexion internet.')), 12000)
+        );
+        const { data, error } = await Promise.race([
+          _db.auth.signInWithPassword({ email, password: mdp }),
+          timeout,
+        ]);
         if (error) throw new Error(error.message);
         await this.demarrerApp(data.user);
-      } catch(e) {
-        errEl.textContent = e.message || 'Email ou mot de passe incorrect.';
+      } catch(err) {
+        errEl.textContent = err.message || 'Email ou mot de passe incorrect.';
         errEl.classList.remove('cache');
         btn.disabled = false;
         btn.textContent = 'Se connecter';
       }
+    };
+    formLogin.addEventListener('submit', (ev) => { ev.preventDefault(); doLogin(); });
+    document.getElementById('btn-login').addEventListener('click', (ev) => {
+      if (ev.target.closest('form')) return; // laisse le submit gérer
+      doLogin();
     });
 
     document.querySelectorAll('.nav-item[data-panel]').forEach(item => {
