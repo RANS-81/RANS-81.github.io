@@ -77,7 +77,7 @@ const Store = {
 
   async load() {
     const [{ data: txns, error: e1 }, { data: imps, error: e2 }] = await Promise.all([
-      _db.from('transactions').select('*').order('date', { ascending: false }),
+      _db.from('transactions').select('*').order('date', { ascending: false }).limit(100000),
       _db.from('imports').select('*').order('date', { ascending: false }),
     ]);
     if (e1) throw new Error('Erreur Supabase (transactions) : ' + e1.message);
