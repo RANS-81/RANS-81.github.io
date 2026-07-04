@@ -209,8 +209,11 @@ const App = {
     const depenses = allTxns.filter(t => t.sens === 'debit');
     const credits = allTxns.filter(t => t.sens === 'credit');
 
+    // Mois complets : union de toutes les transactions pour ne pas manquer les mois sans dépense ou sans revenu
+    const tousLesMois = this.moisDisponibles(allTxns);
+
     // Matrice dépenses (pour graphique par mois)
-    const mois = this.moisDisponibles(depenses);
+    const mois = tousLesMois;
     const categories = [...new Set(depenses.map(t => t.categorie))].sort();
     const matrice = {};
     categories.forEach(c => matrice[c] = {});
@@ -224,7 +227,7 @@ const App = {
     });
 
     // Matrice revenus (pour graphique par mois)
-    const moisRev = this.moisDisponibles(credits);
+    const moisRev = tousLesMois;
     const catsRev = [...new Set(credits.map(t => t.categorie))].sort();
     const matriceRev = {};
     catsRev.forEach(c => matriceRev[c] = {});
