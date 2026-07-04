@@ -81,6 +81,59 @@ const ChartsModule = {
     });
   },
 
+  renderParCategorieParAnnee(canvasId, txns, onClic) {
+    if (typeof Chart === 'undefined') return;
+    const ctx = document.getElementById(canvasId);
+    if (!ctx) return;
+    this._charts[canvasId]?.destroy();
+
+    if (!txns || txns.length === 0) {
+      ctx.getContext('2d').clearRect(0, 0, ctx.width, ctx.height);
+      return;
+    }
+
+    const data = {};
+    const catSet = new Set();
+    txns.forEach(t => {
+      const year = t.date.slice(0, 4);
+      catSet.add(t.categorie);
+      if (!data[year]) data[year] = {};
+      data[year][t.categorie] = (data[year][t.categorie] || 0) + t.montant;
+    });
+
+    const categories = [...catSet].sort();
+    const years = Object.keys(data).sort();
+    const yearColors = ['#5B5FEF', '#12A35E', '#F5A524', '#E5484D', '#0EA5C4', '#D6589F'];
+
+    const datasets = years.map((year, i) => ({
+      label: year,
+      data: categories.map(cat => Number((data[year][cat] || 0).toFixed(2))),
+      backgroundColor: yearColors[i % yearColors.length],
+      borderRadius: 2,
+    }));
+
+    this._charts[canvasId] = new Chart(ctx, {
+      type: 'bar',
+      data: { labels: categories, datasets },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        onClick: onClic ? (evt, els) => {
+          if (!els.length) return;
+          onClic(categories[els[0].index]);
+        } : undefined,
+        plugins: {
+          legend: { position: 'bottom', labels: { font: { family: "'Inter', sans-serif", size: 10 }, color: '#15182B', boxWidth: 10, padding: 8 } },
+          tooltip: { callbacks: { label: (c) => `${c.dataset.label} : ${c.parsed.y.toFixed(2)} €` } },
+        },
+        scales: {
+          x: { ticks: { font: { family: "'Inter', sans-serif", size: 10 }, color: '#6B7088', maxRotation: 45 }, grid: { display: false } },
+          y: { beginAtZero: true, ticks: { font: { family: "'Inter', sans-serif", size: 10 }, color: '#6B7088' }, grid: { color: '#E7E9F1' } },
+        },
+      },
+    });
+  },
+
   renderParCategorie(canvasId, totauxParCategorie, onClic) {
     if (typeof Chart === 'undefined') return;
     const ctx = document.getElementById(canvasId);
