@@ -84,6 +84,12 @@ const App = {
     return txns;
   },
 
+  transactionsPourGraphiques() {
+    let txns = this.state.transactions.filter(t => t.statut === 'normale' || t.statut === 'non_categorisee');
+    if (this.filtrePersonne !== 'tous') txns = txns.filter(t => t.personne === this.filtrePersonne);
+    return txns;
+  },
+
   toast(message, type = 'succes') {
     const el = document.getElementById('toast');
     el.textContent = message;
@@ -199,11 +205,11 @@ const App = {
   },
 
   renderDashboard() {
-    const allTxns = this.transactionsNormales();
+    const allTxns = this.transactionsPourGraphiques();
     const depenses = allTxns.filter(t => t.sens === 'debit');
     const credits = allTxns.filter(t => t.sens === 'credit');
 
-    // Matrice dépenses
+    // Matrice dépenses (pour graphique par mois)
     const mois = this.moisDisponibles(depenses);
     const categories = [...new Set(depenses.map(t => t.categorie))].sort();
     const matrice = {};
@@ -217,7 +223,7 @@ const App = {
       totauxCategorie[c] = Object.values(matrice[c]).reduce((s, v) => s + v, 0);
     });
 
-    // Matrice revenus
+    // Matrice revenus (pour graphique par mois)
     const moisRev = this.moisDisponibles(credits);
     const catsRev = [...new Set(credits.map(t => t.categorie))].sort();
     const matriceRev = {};
@@ -245,24 +251,22 @@ const App = {
 
     if (!aDesDonnees) return;
 
-    // Graphiques dépenses avec onClick → détail transactions
+    // Dépenses par mois (barres empilées)
     ChartsModule.renderParMois('chart-par-mois', mois, categories, matrice, (cat, moisLabel) => {
       const txns = depenses.filter(t => t.categorie === cat && t.date.slice(0, 7) === moisLabel);
       this.ouvrirModal(`${cat} — ${ChartsModule.libelleMoisCourt(moisLabel)}`, txns);
     });
-    ChartsModule.renderParCategorie('chart-par-categorie', totauxCategorie, (cat) => {
+
+    // Dépenses par catégorie et par année (barres groupées)
+    ChartsModule.renderParCategorieParAnnee('chart-par-categorie', depenses, (cat) => {
       const txns = depenses.filter(t => t.categorie === cat);
       this.ouvrirModal(cat, txns);
     });
 
-    // Graphiques revenus avec onClick → détail transactions
+    // Revenus par mois (barres empilées)
     ChartsModule.renderParMois('chart-revenus-mois', moisRev, catsRev, matriceRev, (cat, moisLabel) => {
       const txns = credits.filter(t => t.categorie === cat && t.date.slice(0, 7) === moisLabel);
       this.ouvrirModal(`${cat} — ${ChartsModule.libelleMoisCourt(moisLabel)}`, txns);
-    });
-    ChartsModule.renderParCategorie('chart-revenus-categorie', totauxRev, (cat) => {
-      const txns = credits.filter(t => t.categorie === cat);
-      this.ouvrirModal(cat, txns);
     });
 
     this.renderBilanAnnuel();
@@ -344,7 +348,7 @@ const App = {
   // ---------------------------------------------------------------------
 
   renderAnalyses() {
-    const txns = this.transactionsNormales().filter(t => t.sens === 'debit');
+    const txns = this.transactionsPourGraphiques().filter(t => t.sens === 'debit');
     const aDesDonnees = txns.length > 0;
     document.getElementById('analyses-vide')?.classList.toggle('cache', aDesDonnees);
     document.getElementById('analyses-contenu')?.classList.toggle('cache', !aDesDonnees);
@@ -398,7 +402,7 @@ const App = {
   // ---------------------------------------------------------------------
 
   renderTableauCroise() {
-    const txns = this.transactionsNormales().filter(t => t.sens === 'debit');
+    const txns = this.transactionsPourGraphiques().filter(t => t.sens === 'debit');
     const el = document.getElementById('tableau-croise');
 
     if (txns.length === 0) {
