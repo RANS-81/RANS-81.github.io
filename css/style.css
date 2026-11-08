@@ -264,14 +264,6 @@ button { font-family: inherit; }
 
 /* ---------- KPI ---------- */
 
-.kpi-grid {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 1em;
-  margin-bottom: 1.6em;
-}
-@media (max-width: 900px) { .kpi-grid { grid-template-columns: repeat(2, 1fr); } }
-
 .kpi-carte {
   background: var(--carte);
   border: 1px solid var(--bordure);
@@ -296,6 +288,53 @@ button { font-family: inherit; }
   font-weight: 800;
   letter-spacing: -0.02em;
   font-variant-numeric: tabular-nums;
+}
+
+/* ---------- KPI annuel ---------- */
+
+.kpi-annuel-conteneur {
+  margin-bottom: 1.6em;
+}
+
+.kpi-annuel-grille {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 1em;
+}
+
+.kpi-annee-bloc {
+  background: var(--carte);
+  border: 1px solid var(--bordure);
+  border-radius: var(--rayon);
+  padding: 1.1em 1.3em 1.2em;
+  box-shadow: var(--ombre);
+}
+
+.kpi-annee-titre {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--accent);
+  margin-bottom: 0.9em;
+}
+
+.kpi-annee-vals {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.5em;
+}
+
+.kpi-annee-item .kpi-carte__label {
+  margin-bottom: 0.3em;
+}
+
+.kpi-annee-item .kpi-carte__valeur {
+  font-size: 1.05rem;
+}
+
+.kpi-annee-item--accent .kpi-carte__label {
+  color: var(--texte-att);
 }
 
 /* ---------- Cartes / graphiques ---------- */
