@@ -235,21 +235,27 @@ const App = {
     // KPI par année
     const annees = [...new Set(allTxns.map(t => t.date.slice(0, 4)))].sort();
     var self = this;
-    document.getElementById('dash-kpi-annuel').innerHTML = '<table class="kpi-annuel-table"><tbody>'
-      + annees.map(function(an) {
+    var S = {
+      row: 'display:flex;align-items:center;gap:0;background:var(--carte);border:1px solid var(--bordure);border-radius:var(--rayon);box-shadow:var(--ombre);padding:0.7em 1.2em;margin-bottom:0.4em;',
+      annee: 'font-size:0.78rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--accent);min-width:3.5em;flex-shrink:0;',
+      cell: 'display:flex;flex-direction:column;gap:0.1em;flex:1;padding-left:1.3em;border-left:1px solid var(--bordure);margin-left:1.1em;',
+      label: 'font-size:0.68rem;font-weight:600;text-transform:uppercase;letter-spacing:0.04em;color:var(--texte-att);',
+      valPos: 'font-size:1rem;font-weight:700;color:var(--vert);',
+      valNeg: 'font-size:1rem;font-weight:700;color:var(--rouge);',
+    };
+    document.getElementById('dash-kpi-annuel').innerHTML = annees.map(function(an) {
           var rev = credits.filter(function(t) { return t.date.startsWith(an); }).reduce(function(s, t) { return s + t.montant; }, 0);
           var dep = depenses.filter(function(t) { return t.date.startsWith(an); }).reduce(function(s, t) { return s + t.montant; }, 0);
           var net = rev - dep;
           var signe = net >= 0 ? '+' : '';
-          var classeNet = net >= 0 ? 'pos' : 'neg';
-          return '<tr>'
-            + '<td class="kpi-an-annee">' + an + '</td>'
-            + '<td class="kpi-an-cell"><span class="kpi-an-label">Revenus</span><span class="kpi-an-val pos">' + self.formatMontant(rev) + '</span></td>'
-            + '<td class="kpi-an-cell"><span class="kpi-an-label">Dépenses</span><span class="kpi-an-val neg">' + self.formatMontant(dep) + '</span></td>'
-            + '<td class="kpi-an-cell kpi-an-cell--net"><span class="kpi-an-label">Solde net</span><span class="kpi-an-val ' + classeNet + '">' + signe + self.formatMontant(Math.abs(net)) + '</span></td>'
-            + '</tr>';
-        }).join('')
-      + '</tbody></table>';
+          var valNet = net >= 0 ? S.valPos : S.valNeg;
+          return '<div style="' + S.row + '">'
+            + '<span style="' + S.annee + '">' + an + '</span>'
+            + '<div style="' + S.cell + '"><span style="' + S.label + '">Revenus</span><span style="' + S.valPos + '">' + self.formatMontant(rev) + '</span></div>'
+            + '<div style="' + S.cell + '"><span style="' + S.label + '">Dépenses</span><span style="' + S.valNeg + '">' + self.formatMontant(dep) + '</span></div>'
+            + '<div style="' + S.cell + '"><span style="' + S.label + '">Solde net</span><span style="' + valNet + '">' + signe + self.formatMontant(Math.abs(net)) + '</span></div>'
+            + '</div>';
+        }).join('');
 
     const aDesDonnees = this.state.transactions.length > 0;
     document.getElementById('dashboard-vide').classList.toggle('cache', aDesDonnees);
