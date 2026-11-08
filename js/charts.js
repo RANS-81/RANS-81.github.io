@@ -75,21 +75,7 @@ const ChartsModule = {
         },
         scales: {
           x: { stacked: true, ticks: { font: { family: "'Inter', sans-serif", size: 10 }, color: '#6B7088' }, grid: { display: false } },
-          y: {
-            stacked: true,
-            position: 'left',
-            ticks: { font: { family: "'Inter', sans-serif", size: 10 }, color: '#6B7088', callback: (v) => v.toLocaleString('fr-FR') },
-            grid: { color: '#E7E9F1' },
-          },
-          yRight: {
-            position: 'right',
-            ticks: { font: { family: "'Inter', sans-serif", size: 10 }, color: '#6B7088', callback: (v) => v.toLocaleString('fr-FR') },
-            grid: { drawOnChartArea: false },
-            afterBuildTicks(scale) {
-              const left = scale.chart.scales.y;
-              if (left) { scale.min = left.min; scale.max = left.max; scale.ticks = left.ticks.map(t => ({ ...t })); }
-            },
-          },
+          y: { stacked: true, ticks: { font: { family: "'Inter', sans-serif", size: 10 }, color: '#6B7088' }, grid: { color: '#E7E9F1' } },
         },
       },
     });
