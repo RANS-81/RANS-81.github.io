@@ -174,7 +174,6 @@ const App = {
         return;
       }
 
-      // Import direct : pas d'étape de confirmation manuelle, on alimente le tableau de bord tout de suite
       const { ajoutees, doublons } = await Store.importerTransactions(file.name, personne, resultat.transactions);
       this.state = await Store.load();
 
@@ -187,7 +186,6 @@ const App = {
       this.renderAll();
       this.toast(`${ajoutees} transaction(s) importée(s) pour ${this.labelPersonne(personne).toLowerCase()}`);
 
-      // Bascule automatique vers le tableau de bord pour voir le résultat immédiatement
       setTimeout(() => this.allerVersPanel('dashboard'), 700);
 
     } catch (e) {
@@ -209,10 +207,8 @@ const App = {
     const depenses = allTxns.filter(t => t.sens === 'debit');
     const credits = allTxns.filter(t => t.sens === 'credit');
 
-    // Mois complets : union de toutes les transactions pour ne pas manquer les mois sans dépense ou sans revenu
     const tousLesMois = this.moisDisponibles(allTxns);
 
-    // Matrice dépenses (pour graphique par mois)
     const mois = tousLesMois;
     const categories = [...new Set(depenses.map(t => t.categorie))].sort();
     const matrice = {};
@@ -221,12 +217,7 @@ const App = {
       const m = t.date.slice(0, 7);
       matrice[t.categorie][m] = (matrice[t.categorie][m] || 0) + t.montant;
     });
-    const totauxCategorie = {};
-    categories.forEach(c => {
-      totauxCategorie[c] = Object.values(matrice[c]).reduce((s, v) => s + v, 0);
-    });
 
-    // Matrice revenus (pour graphique par mois)
     const moisRev = tousLesMois;
     const catsRev = [...new Set(credits.map(t => t.categorie))].sort();
     const matriceRev = {};
@@ -235,18 +226,28 @@ const App = {
       const m = t.date.slice(0, 7);
       matriceRev[t.categorie][m] = (matriceRev[t.categorie][m] || 0) + t.montant;
     });
-    const totauxRev = {};
-    catsRev.forEach(c => {
-      totauxRev[c] = Object.values(matriceRev[c]).reduce((s, v) => s + v, 0);
-    });
 
-    const totalDepenses = Object.values(totauxCategorie).reduce((s, v) => s + v, 0);
-    const totalRevenus = Object.values(totauxRev).reduce((s, v) => s + v, 0);
-
-    document.getElementById('dash-revenus').textContent = this.formatMontant(totalRevenus);
-    document.getElementById('dash-depenses').textContent = this.formatMontant(totalDepenses);
-    document.getElementById('dash-net').textContent = this.formatMontant(totalRevenus - totalDepenses);
-    document.getElementById('dash-nb-mois').textContent = Math.max(mois.length, moisRev.length);
+    // KPI par année
+    const annees = [...new Set(allTxns.map(t => t.date.slice(0, 4)))].sort();
+    const nbMois = Math.max(mois.length, moisRev.length);
+    var self = this;
+    document.getElementById('dash-kpi-annuel').innerHTML = '<div class="kpi-annuel-grille">'
+      + annees.map(function(an) {
+          var rev = credits.filter(function(t) { return t.date.startsWith(an); }).reduce(function(s, t) { return s + t.montant; }, 0);
+          var dep = depenses.filter(function(t) { return t.date.startsWith(an); }).reduce(function(s, t) { return s + t.montant; }, 0);
+          var net = rev - dep;
+          var signe = net >= 0 ? '+' : '';
+          var classeNet = net >= 0 ? 'pos' : 'neg';
+          return '<div class="kpi-annee-bloc">'
+            + '<div class="kpi-annee-titre">' + an + '</div>'
+            + '<div class="kpi-annee-vals">'
+            + '<div class="kpi-annee-item"><span class="kpi-carte__label">Revenus</span><span class="kpi-carte__valeur pos">' + self.formatMontant(rev) + '</span></div>'
+            + '<div class="kpi-annee-item"><span class="kpi-carte__label">Dépenses</span><span class="kpi-carte__valeur neg">' + self.formatMontant(dep) + '</span></div>'
+            + '<div class="kpi-annee-item kpi-annee-item--accent"><span class="kpi-carte__label">Solde net</span><span class="kpi-carte__valeur ' + classeNet + '">' + signe + self.formatMontant(Math.abs(net)) + '</span></div>'
+            + '</div></div>';
+        }).join('')
+      + '<div class="kpi-carte"><span class="kpi-carte__label">Mois couverts</span><span class="kpi-carte__valeur" id="dash-nb-mois">' + nbMois + '</span></div>'
+      + '</div>';
 
     const aDesDonnees = this.state.transactions.length > 0;
     document.getElementById('dashboard-vide').classList.toggle('cache', aDesDonnees);
@@ -254,19 +255,16 @@ const App = {
 
     if (!aDesDonnees) return;
 
-    // Dépenses par mois (barres empilées)
     ChartsModule.renderParMois('chart-par-mois', mois, categories, matrice, (cat, moisLabel) => {
       const txns = depenses.filter(t => t.categorie === cat && t.date.slice(0, 7) === moisLabel);
       this.ouvrirModal(`${cat} — ${ChartsModule.libelleMoisCourt(moisLabel)}`, txns);
     });
 
-    // Dépenses par catégorie et par année (barres groupées)
     ChartsModule.renderParCategorieParAnnee('chart-par-categorie', depenses, (cat) => {
       const txns = depenses.filter(t => t.categorie === cat);
       this.ouvrirModal(cat, txns);
     });
 
-    // Revenus par mois (barres empilées)
     ChartsModule.renderParMois('chart-revenus-mois', moisRev, catsRev, matriceRev, (cat, moisLabel) => {
       const txns = credits.filter(t => t.categorie === cat && t.date.slice(0, 7) === moisLabel);
       this.ouvrirModal(`${cat} — ${ChartsModule.libelleMoisCourt(moisLabel)}`, txns);
@@ -308,7 +306,6 @@ const App = {
 
     const MOIS = ['Jan','Fév','Mar','Avr','Mai','Jun','Jul','Aoû','Sep','Oct','Nov','Déc'];
 
-    // Construire une map { année: { mois (0-11): { rev, dep } } }
     const data = {};
     txns.forEach(t => {
       const d = new Date(t.date);
@@ -347,7 +344,7 @@ const App = {
   },
 
   // ---------------------------------------------------------------------
-  // Analyses — graphique linéaire par catégorie
+  // Analyses
   // ---------------------------------------------------------------------
 
   renderAnalyses() {
@@ -369,7 +366,6 @@ const App = {
 
     ChartsModule.renderMiniLignes('analyses-graphiques', mois, categories, matrice);
 
-    // Tableau récapitulatif : total, moyenne, max par catégorie
     const totaux = categories.map(cat => {
       const vals = mois.map(m => matrice[cat][m] || 0);
       const total = vals.reduce((s, v) => s + v, 0);
@@ -450,10 +446,7 @@ const App = {
 
     el.innerHTML = html;
 
-    // Afficher le bouton d'export
     document.getElementById('btn-export-croise')?.classList.remove('cache');
-
-    // Stocker les données pour l'export (remplacées à chaque render)
     this._croiseData = { mois, categories, matrice, totalParMois, totalGeneral };
   },
 
@@ -462,22 +455,19 @@ const App = {
     if (!mois) return;
 
     const sep = ';';
-    const num = v => v.toFixed(2).replace('.', ','); // format décimal français
+    const num = v => v.toFixed(2).replace('.', ',');
     const lignes = [];
 
-    // En-tête
     lignes.push(['Catégorie', ...mois.map(m => ChartsModule.libelleMoisCourt(m)), 'Total'].join(sep));
 
-    // Lignes catégories
     categories.forEach(cat => {
       const totalLigne = mois.reduce((s, m) => s + (matrice[cat][m] || 0), 0);
       lignes.push([cat, ...mois.map(m => num(matrice[cat][m] || 0)), num(totalLigne)].join(sep));
     });
 
-    // Ligne totaux
     lignes.push(['Total', ...mois.map(m => num(totalParMois[m])), num(totalGeneral)].join(sep));
 
-    const bom = '﻿'; // BOM UTF-8 pour Excel
+    const bom = '\uFEFF';
     const blob = new Blob([bom + lignes.join('\r\n')], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -558,7 +548,6 @@ const App = {
   // ---------------------------------------------------------------------
 
   bindEvents() {
-    // Formulaire de login
     const formLogin = document.getElementById('form-login');
     const doLogin = async () => {
       const email = document.getElementById('login-email').value.trim();
@@ -588,7 +577,7 @@ const App = {
     };
     formLogin.addEventListener('submit', (ev) => { ev.preventDefault(); doLogin(); });
     document.getElementById('btn-login').addEventListener('click', (ev) => {
-      if (ev.target.closest('form')) return; // laisse le submit gérer
+      if (ev.target.closest('form')) return;
       doLogin();
     });
 
@@ -618,7 +607,6 @@ const App = {
       if (e.target.files[0]) this.onFichierChoisi(e.target.files[0], 'madame');
     });
 
-    // Glisser-déposer sur les zones d'upload
     [['input-csv-monsieur', 'monsieur'], ['input-csv-madame', 'madame']].forEach(([inputId, personne]) => {
       const input = document.getElementById(inputId);
       const zone = input.closest('.import-carte').querySelector('.zone-upload');
@@ -654,12 +642,12 @@ const App = {
   },
 
   // ---------------------------------------------------------------------
-  // Assistant IA — générateur de prompt contextuel
+  // Assistant IA
   // ---------------------------------------------------------------------
 
   SUGGESTIONS: [
     'Quelles catégories ont le plus augmenté ces 3 derniers mois ?',
-    'Quel est mon taux d\'épargne moyen sur la période ?',
+    "Quel est mon taux d'épargne moyen sur la période ?",
     'Quels mois ont un solde négatif et pourquoi ?',
     'Quelles dépenses pourrais-je réduire pour améliorer mon solde ?',
     'Compare mes revenus et dépenses par trimestre.',
@@ -690,7 +678,6 @@ const App = {
     const totalRev = rev.reduce((s, t) => s + t.montant, 0);
     const mois = this.moisDisponibles(dep.concat(rev));
 
-    // Totaux par catégorie de dépenses
     const parCat = {};
     dep.forEach(t => { parCat[t.categorie] = (parCat[t.categorie] || 0) + t.montant; });
     const lignesCat = Object.entries(parCat)
@@ -698,7 +685,6 @@ const App = {
       .map(([c, v]) => `  - ${c} : ${this.formatMontant(v)}`)
       .join('\n');
 
-    // Bilan mensuel
     const bilanMois = {};
     txns.forEach(t => {
       const m = t.date.slice(0, 7);
@@ -712,7 +698,7 @@ const App = {
       return `  - ${ChartsModule.libelleMoisCourt(m)} : revenus ${this.formatMontant(b.rev)}, dépenses ${this.formatMontant(b.dep)}, solde ${net >= 0 ? '+' : ''}${this.formatMontant(Math.abs(net))}`;
     }).join('\n');
 
-    return `## Données financières du foyer (période : ${ChartsModule.libelleMoisCourt(mois[0])} → ${ChartsModule.libelleMoisCourt(mois[mois.length - 1])})
+    return `## Données financières du foyer (période : ${ChartsModule.libelleMoisCourt(mois[0])} \u2192 ${ChartsModule.libelleMoisCourt(mois[mois.length - 1])})
 
 ### Résumé global
 - Revenus totaux : ${this.formatMontant(totalRev)}
@@ -735,7 +721,6 @@ ${lignesMois}`;
       ? `${question}\n\n---\n${contexte}`
       : contexte;
 
-    // Afficher aperçu
     const apercu = document.getElementById('assistant-apercu');
     const apercuWrap = document.getElementById('assistant-apercu-wrap');
     if (apercu) apercu.textContent = prompt;
