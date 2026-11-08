@@ -18,40 +18,9 @@ const App = {
     import: 'Importer un relevé',
   },
 
-  async init() {
-    this.bindEvents();       // listeners attachés en premier, y compris le form login
-    await this.verifierSession();
-  },
-
-  async verifierSession() {
-    try {
-      const resp = await _db.auth.getSession();
-      const session = resp?.data?.session ?? null;
-      if (!session) {
-        this._montrerLogin();
-        return;
-      }
-      await this.demarrerApp(session.user);
-    } catch(e) {
-      this._montrerLogin('Erreur de connexion au serveur : ' + e.message);
-    }
-  },
-
-  _montrerLogin(msgErreur) {
-    document.getElementById('ecran-login').classList.remove('cache');
-    document.querySelector('.shell').classList.add('cache');
-    if (msgErreur) {
-      const errEl = document.getElementById('login-erreur');
-      errEl.textContent = msgErreur;
-      errEl.classList.remove('cache');
-    }
-  },
-
-  async demarrerApp(user) {
-    document.getElementById('ecran-login').classList.add('cache');
-    document.querySelector('.shell').classList.remove('cache');
-    document.getElementById('sidebar-utilisateur').textContent = user.email;
-    this.state = await Store.load();
+  init() {
+    this.state = Store.load();
+    this.bindEvents();
     this.renderAll();
   },
 
@@ -80,12 +49,6 @@ const App = {
 
   transactionsNormales() {
     let txns = this.state.transactions.filter(t => t.statut === 'normale');
-    if (this.filtrePersonne !== 'tous') txns = txns.filter(t => t.personne === this.filtrePersonne);
-    return txns;
-  },
-
-  transactionsPourGraphiques() {
-    let txns = this.state.transactions.filter(t => t.statut === 'normale' || t.statut === 'non_categorisee');
     if (this.filtrePersonne !== 'tous') txns = txns.filter(t => t.personne === this.filtrePersonne);
     return txns;
   },
@@ -174,8 +137,9 @@ const App = {
         return;
       }
 
-      const { ajoutees, doublons } = await Store.importerTransactions(file.name, personne, resultat.transactions);
-      this.state = await Store.load();
+      // Import direct : pas d'étape de confirmation manuelle, on alimente le tableau de bord tout de suite
+      const { ajoutees, doublons } = Store.importerTransactions(file.name, personne, resultat.transactions);
+      this.state = Store.getState();
 
       const message = doublons > 0
         ? `${ajoutees} transaction(s) ajoutée(s) · ${doublons} doublon(s) déjà connus ignoré(s)`
@@ -186,6 +150,7 @@ const App = {
       this.renderAll();
       this.toast(`${ajoutees} transaction(s) importée(s) pour ${this.labelPersonne(personne).toLowerCase()}`);
 
+      // Bascule automatique vers le tableau de bord pour voir le résultat immédiatement
       setTimeout(() => this.allerVersPanel('dashboard'), 700);
 
     } catch (e) {
@@ -203,13 +168,12 @@ const App = {
   },
 
   renderDashboard() {
-    const allTxns = this.transactionsPourGraphiques();
+    const allTxns = this.transactionsNormales();
     const depenses = allTxns.filter(t => t.sens === 'debit');
     const credits = allTxns.filter(t => t.sens === 'credit');
 
-    const tousLesMois = this.moisDisponibles(allTxns);
-
-    const mois = tousLesMois;
+    // Matrice dépenses
+    const mois = this.moisDisponibles(depenses);
     const categories = [...new Set(depenses.map(t => t.categorie))].sort();
     const matrice = {};
     categories.forEach(c => matrice[c] = {});
@@ -217,8 +181,13 @@ const App = {
       const m = t.date.slice(0, 7);
       matrice[t.categorie][m] = (matrice[t.categorie][m] || 0) + t.montant;
     });
+    const totauxCategorie = {};
+    categories.forEach(c => {
+      totauxCategorie[c] = Object.values(matrice[c]).reduce((s, v) => s + v, 0);
+    });
 
-    const moisRev = tousLesMois;
+    // Matrice revenus
+    const moisRev = this.moisDisponibles(credits);
     const catsRev = [...new Set(credits.map(t => t.categorie))].sort();
     const matriceRev = {};
     catsRev.forEach(c => matriceRev[c] = {});
@@ -226,28 +195,18 @@ const App = {
       const m = t.date.slice(0, 7);
       matriceRev[t.categorie][m] = (matriceRev[t.categorie][m] || 0) + t.montant;
     });
+    const totauxRev = {};
+    catsRev.forEach(c => {
+      totauxRev[c] = Object.values(matriceRev[c]).reduce((s, v) => s + v, 0);
+    });
 
-    // KPI par année
-    const annees = [...new Set(allTxns.map(t => t.date.slice(0, 4)))].sort();
-    const nbMois = Math.max(mois.length, moisRev.length);
-    var self = this;
-    document.getElementById('dash-kpi-annuel').innerHTML = '<div class="kpi-annuel-grille">'
-      + annees.map(function(an) {
-          var rev = credits.filter(function(t) { return t.date.startsWith(an); }).reduce(function(s, t) { return s + t.montant; }, 0);
-          var dep = depenses.filter(function(t) { return t.date.startsWith(an); }).reduce(function(s, t) { return s + t.montant; }, 0);
-          var net = rev - dep;
-          var signe = net >= 0 ? '+' : '';
-          var classeNet = net >= 0 ? 'pos' : 'neg';
-          return '<div class="kpi-annee-bloc">'
-            + '<div class="kpi-annee-titre">' + an + '</div>'
-            + '<div class="kpi-annee-vals">'
-            + '<div class="kpi-annee-item"><span class="kpi-carte__label">Revenus</span><span class="kpi-carte__valeur pos">' + self.formatMontant(rev) + '</span></div>'
-            + '<div class="kpi-annee-item"><span class="kpi-carte__label">Dépenses</span><span class="kpi-carte__valeur neg">' + self.formatMontant(dep) + '</span></div>'
-            + '<div class="kpi-annee-item kpi-annee-item--accent"><span class="kpi-carte__label">Solde net</span><span class="kpi-carte__valeur ' + classeNet + '">' + signe + self.formatMontant(Math.abs(net)) + '</span></div>'
-            + '</div></div>';
-        }).join('')
-      + '<div class="kpi-carte"><span class="kpi-carte__label">Mois couverts</span><span class="kpi-carte__valeur" id="dash-nb-mois">' + nbMois + '</span></div>'
-      + '</div>';
+    const totalDepenses = Object.values(totauxCategorie).reduce((s, v) => s + v, 0);
+    const totalRevenus = Object.values(totauxRev).reduce((s, v) => s + v, 0);
+
+    document.getElementById('dash-revenus').textContent = this.formatMontant(totalRevenus);
+    document.getElementById('dash-depenses').textContent = this.formatMontant(totalDepenses);
+    document.getElementById('dash-net').textContent = this.formatMontant(totalRevenus - totalDepenses);
+    document.getElementById('dash-nb-mois').textContent = Math.max(mois.length, moisRev.length);
 
     const aDesDonnees = this.state.transactions.length > 0;
     document.getElementById('dashboard-vide').classList.toggle('cache', aDesDonnees);
@@ -255,19 +214,24 @@ const App = {
 
     if (!aDesDonnees) return;
 
+    // Graphiques dépenses avec onClick → détail transactions
     ChartsModule.renderParMois('chart-par-mois', mois, categories, matrice, (cat, moisLabel) => {
       const txns = depenses.filter(t => t.categorie === cat && t.date.slice(0, 7) === moisLabel);
       this.ouvrirModal(`${cat} — ${ChartsModule.libelleMoisCourt(moisLabel)}`, txns);
     });
-
-    ChartsModule.renderParCategorieParAnnee('chart-par-categorie', depenses, (cat) => {
+    ChartsModule.renderParCategorie('chart-par-categorie', totauxCategorie, (cat) => {
       const txns = depenses.filter(t => t.categorie === cat);
       this.ouvrirModal(cat, txns);
     });
 
+    // Graphiques revenus avec onClick → détail transactions
     ChartsModule.renderParMois('chart-revenus-mois', moisRev, catsRev, matriceRev, (cat, moisLabel) => {
       const txns = credits.filter(t => t.categorie === cat && t.date.slice(0, 7) === moisLabel);
       this.ouvrirModal(`${cat} — ${ChartsModule.libelleMoisCourt(moisLabel)}`, txns);
+    });
+    ChartsModule.renderParCategorie('chart-revenus-categorie', totauxRev, (cat) => {
+      const txns = credits.filter(t => t.categorie === cat);
+      this.ouvrirModal(cat, txns);
     });
 
     this.renderBilanAnnuel();
@@ -306,6 +270,7 @@ const App = {
 
     const MOIS = ['Jan','Fév','Mar','Avr','Mai','Jun','Jul','Aoû','Sep','Oct','Nov','Déc'];
 
+    // Construire une map { année: { mois (0-11): { rev, dep } } }
     const data = {};
     txns.forEach(t => {
       const d = new Date(t.date);
@@ -344,11 +309,11 @@ const App = {
   },
 
   // ---------------------------------------------------------------------
-  // Analyses
+  // Analyses — graphique linéaire par catégorie
   // ---------------------------------------------------------------------
 
   renderAnalyses() {
-    const txns = this.transactionsPourGraphiques().filter(t => t.sens === 'debit');
+    const txns = this.transactionsNormales().filter(t => t.sens === 'debit');
     const aDesDonnees = txns.length > 0;
     document.getElementById('analyses-vide')?.classList.toggle('cache', aDesDonnees);
     document.getElementById('analyses-contenu')?.classList.toggle('cache', !aDesDonnees);
@@ -366,6 +331,7 @@ const App = {
 
     ChartsModule.renderMiniLignes('analyses-graphiques', mois, categories, matrice);
 
+    // Tableau récapitulatif : total, moyenne, max par catégorie
     const totaux = categories.map(cat => {
       const vals = mois.map(m => matrice[cat][m] || 0);
       const total = vals.reduce((s, v) => s + v, 0);
@@ -401,7 +367,7 @@ const App = {
   // ---------------------------------------------------------------------
 
   renderTableauCroise() {
-    const txns = this.transactionsPourGraphiques().filter(t => t.sens === 'debit');
+    const txns = this.transactionsNormales().filter(t => t.sens === 'debit');
     const el = document.getElementById('tableau-croise');
 
     if (txns.length === 0) {
@@ -446,7 +412,10 @@ const App = {
 
     el.innerHTML = html;
 
+    // Afficher le bouton d'export
     document.getElementById('btn-export-croise')?.classList.remove('cache');
+
+    // Stocker les données pour l'export (remplacées à chaque render)
     this._croiseData = { mois, categories, matrice, totalParMois, totalGeneral };
   },
 
@@ -455,19 +424,22 @@ const App = {
     if (!mois) return;
 
     const sep = ';';
-    const num = v => v.toFixed(2).replace('.', ',');
+    const num = v => v.toFixed(2).replace('.', ','); // format décimal français
     const lignes = [];
 
+    // En-tête
     lignes.push(['Catégorie', ...mois.map(m => ChartsModule.libelleMoisCourt(m)), 'Total'].join(sep));
 
+    // Lignes catégories
     categories.forEach(cat => {
       const totalLigne = mois.reduce((s, m) => s + (matrice[cat][m] || 0), 0);
       lignes.push([cat, ...mois.map(m => num(matrice[cat][m] || 0)), num(totalLigne)].join(sep));
     });
 
+    // Ligne totaux
     lignes.push(['Total', ...mois.map(m => num(totalParMois[m])), num(totalGeneral)].join(sep));
 
-    const bom = '\uFEFF';
+    const bom = '﻿'; // BOM UTF-8 pour Excel
     const blob = new Blob([bom + lignes.join('\r\n')], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -548,39 +520,6 @@ const App = {
   // ---------------------------------------------------------------------
 
   bindEvents() {
-    const formLogin = document.getElementById('form-login');
-    const doLogin = async () => {
-      const email = document.getElementById('login-email').value.trim();
-      const mdp = document.getElementById('login-mdp').value;
-      const btn = document.getElementById('btn-login');
-      const errEl = document.getElementById('login-erreur');
-      if (!email || !mdp) return;
-      btn.disabled = true;
-      btn.textContent = 'Connexion…';
-      errEl.classList.add('cache');
-      try {
-        const timeout = new Promise((_, reject) =>
-          setTimeout(() => reject(new Error('Délai dépassé — vérifie ta connexion internet.')), 12000)
-        );
-        const { data, error } = await Promise.race([
-          _db.auth.signInWithPassword({ email, password: mdp }),
-          timeout,
-        ]);
-        if (error) throw new Error(error.message);
-        await this.demarrerApp(data.user);
-      } catch(err) {
-        errEl.textContent = err.message || 'Email ou mot de passe incorrect.';
-        errEl.classList.remove('cache');
-        btn.disabled = false;
-        btn.textContent = 'Se connecter';
-      }
-    };
-    formLogin.addEventListener('submit', (ev) => { ev.preventDefault(); doLogin(); });
-    document.getElementById('btn-login').addEventListener('click', (ev) => {
-      if (ev.target.closest('form')) return;
-      doLogin();
-    });
-
     document.querySelectorAll('.nav-item[data-panel]').forEach(item => {
       item.addEventListener('click', () => this.allerVersPanel(item.dataset.panel));
     });
@@ -607,6 +546,7 @@ const App = {
       if (e.target.files[0]) this.onFichierChoisi(e.target.files[0], 'madame');
     });
 
+    // Glisser-déposer sur les zones d'upload
     [['input-csv-monsieur', 'monsieur'], ['input-csv-madame', 'madame']].forEach(([inputId, personne]) => {
       const input = document.getElementById(inputId);
       const zone = input.closest('.import-carte').querySelector('.zone-upload');
@@ -621,11 +561,6 @@ const App = {
 
     document.getElementById('btn-reset').addEventListener('click', () => this.confirmerReset());
 
-    document.getElementById('btn-logout').addEventListener('click', async () => {
-      await _db.auth.signOut();
-      location.reload();
-    });
-
     document.getElementById('modal-fermer')?.addEventListener('click', () =>
       document.getElementById('modal-detail').classList.add('cache'));
     document.getElementById('modal-detail')?.addEventListener('click', (e) => {
@@ -633,21 +568,21 @@ const App = {
     });
   },
 
-  async confirmerReset() {
+  confirmerReset() {
     if (!confirm('Cela supprime définitivement toutes les transactions importées. Continuer ?')) return;
-    await Store.resetAll();
+    Store.resetAll();
     this.state = Store.getState();
     this.renderAll();
     this.toast('Toutes les données ont été effacées.');
   },
 
   // ---------------------------------------------------------------------
-  // Assistant IA
+  // Assistant IA — générateur de prompt contextuel
   // ---------------------------------------------------------------------
 
   SUGGESTIONS: [
     'Quelles catégories ont le plus augmenté ces 3 derniers mois ?',
-    "Quel est mon taux d'épargne moyen sur la période ?",
+    'Quel est mon taux d\'épargne moyen sur la période ?',
     'Quels mois ont un solde négatif et pourquoi ?',
     'Quelles dépenses pourrais-je réduire pour améliorer mon solde ?',
     'Compare mes revenus et dépenses par trimestre.',
@@ -678,6 +613,7 @@ const App = {
     const totalRev = rev.reduce((s, t) => s + t.montant, 0);
     const mois = this.moisDisponibles(dep.concat(rev));
 
+    // Totaux par catégorie de dépenses
     const parCat = {};
     dep.forEach(t => { parCat[t.categorie] = (parCat[t.categorie] || 0) + t.montant; });
     const lignesCat = Object.entries(parCat)
@@ -685,6 +621,7 @@ const App = {
       .map(([c, v]) => `  - ${c} : ${this.formatMontant(v)}`)
       .join('\n');
 
+    // Bilan mensuel
     const bilanMois = {};
     txns.forEach(t => {
       const m = t.date.slice(0, 7);
@@ -698,7 +635,7 @@ const App = {
       return `  - ${ChartsModule.libelleMoisCourt(m)} : revenus ${this.formatMontant(b.rev)}, dépenses ${this.formatMontant(b.dep)}, solde ${net >= 0 ? '+' : ''}${this.formatMontant(Math.abs(net))}`;
     }).join('\n');
 
-    return `## Données financières du foyer (période : ${ChartsModule.libelleMoisCourt(mois[0])} \u2192 ${ChartsModule.libelleMoisCourt(mois[mois.length - 1])})
+    return `## Données financières du foyer (période : ${ChartsModule.libelleMoisCourt(mois[0])} → ${ChartsModule.libelleMoisCourt(mois[mois.length - 1])})
 
 ### Résumé global
 - Revenus totaux : ${this.formatMontant(totalRev)}
@@ -721,6 +658,7 @@ ${lignesMois}`;
       ? `${question}\n\n---\n${contexte}`
       : contexte;
 
+    // Afficher aperçu
     const apercu = document.getElementById('assistant-apercu');
     const apercuWrap = document.getElementById('assistant-apercu-wrap');
     if (apercu) apercu.textContent = prompt;
@@ -737,12 +675,14 @@ ${lignesMois}`;
 };
 
 document.addEventListener('DOMContentLoaded', () => {
-  App.init().catch(e => {
+  try {
+    App.init();
+  } catch(e) {
     document.body.insertAdjacentHTML('afterbegin',
       `<div style="background:#fde;border:2px solid #c00;padding:1rem 1.5rem;font-family:monospace;font-size:13px;position:fixed;top:0;left:0;right:0;z-index:9999">
         <b>Erreur JS :</b> ${e.message}<br><small>${e.stack?.split('\n')[1] || ''}</small>
       </div>`);
-  });
+  }
 });
 
 window.addEventListener('error', (e) => {
