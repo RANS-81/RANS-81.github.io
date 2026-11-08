@@ -18,40 +18,9 @@ const App = {
     import: 'Importer un relevé',
   },
 
-  async init() {
-    this.bindEvents();       // listeners attachés en premier, y compris le form login
-    await this.verifierSession();
-  },
-
-  async verifierSession() {
-    try {
-      const resp = await _db.auth.getSession();
-      const session = resp?.data?.session ?? null;
-      if (!session) {
-        this._montrerLogin();
-        return;
-      }
-      await this.demarrerApp(session.user);
-    } catch(e) {
-      this._montrerLogin('Erreur de connexion au serveur : ' + e.message);
-    }
-  },
-
-  _montrerLogin(msgErreur) {
-    document.getElementById('ecran-login').classList.remove('cache');
-    document.querySelector('.shell').classList.add('cache');
-    if (msgErreur) {
-      const errEl = document.getElementById('login-erreur');
-      errEl.textContent = msgErreur;
-      errEl.classList.remove('cache');
-    }
-  },
-
-  async demarrerApp(user) {
-    document.getElementById('ecran-login').classList.add('cache');
-    document.querySelector('.shell').classList.remove('cache');
-    document.getElementById('sidebar-utilisateur').textContent = user.email;
-    this.state = await Store.load();
+  init() {
+    this.state = Store.load();
+    this.bindEvents();
     this.renderAll();
   },
 
@@ -80,12 +49,6 @@ const App = {
 
   transactionsNormales() {
     let txns = this.state.transactions.filter(t => t.statut === 'normale');
-    if (this.filtrePersonne !== 'tous') txns = txns.filter(t => t.personne === this.filtrePersonne);
-    return txns;
-  },
-
-  transactionsPourGraphiques() {
-    let txns = this.state.transactions.filter(t => t.statut === 'normale' || t.statut === 'non_categorisee');
     if (this.filtrePersonne !== 'tous') txns = txns.filter(t => t.personne === this.filtrePersonne);
     return txns;
   },
@@ -127,7 +90,7 @@ const App = {
 
   renderImportHistorique() {
     const el = document.getElementById('import-historique');
-    const imports = [...(this.state.imports || [])].sort((a, b) => b.date - a.date);
+    const imports = [...this.state.imports].sort((a, b) => b.date - a.date);
     if (imports.length === 0) {
       el.innerHTML = '<p class="vide">Aucun import effectué pour le moment.</p>';
       return;
@@ -175,8 +138,8 @@ const App = {
       }
 
       // Import direct : pas d'étape de confirmation manuelle, on alimente le tableau de bord tout de suite
-      const { ajoutees, doublons } = await Store.importerTransactions(file.name, personne, resultat.transactions);
-      this.state = await Store.load();
+      const { ajoutees, doublons } = Store.importerTransactions(file.name, personne, resultat.transactions);
+      this.state = Store.getState();
 
       const message = doublons > 0
         ? `${ajoutees} transaction(s) ajoutée(s) · ${doublons} doublon(s) déjà connus ignoré(s)`
@@ -205,15 +168,12 @@ const App = {
   },
 
   renderDashboard() {
-    const allTxns = this.transactionsPourGraphiques();
+    const allTxns = this.transactionsNormales();
     const depenses = allTxns.filter(t => t.sens === 'debit');
     const credits = allTxns.filter(t => t.sens === 'credit');
 
-    // Mois complets : union de toutes les transactions pour ne pas manquer les mois sans dépense ou sans revenu
-    const tousLesMois = this.moisDisponibles(allTxns);
-
-    // Matrice dépenses (pour graphique par mois)
-    const mois = tousLesMois;
+    // Matrice dépenses
+    const mois = this.moisDisponibles(depenses);
     const categories = [...new Set(depenses.map(t => t.categorie))].sort();
     const matrice = {};
     categories.forEach(c => matrice[c] = {});
@@ -221,9 +181,13 @@ const App = {
       const m = t.date.slice(0, 7);
       matrice[t.categorie][m] = (matrice[t.categorie][m] || 0) + t.montant;
     });
+    const totauxCategorie = {};
+    categories.forEach(c => {
+      totauxCategorie[c] = Object.values(matrice[c]).reduce((s, v) => s + v, 0);
+    });
 
-    // Matrice revenus (pour graphique par mois)
-    const moisRev = tousLesMois;
+    // Matrice revenus
+    const moisRev = this.moisDisponibles(credits);
     const catsRev = [...new Set(credits.map(t => t.categorie))].sort();
     const matriceRev = {};
     catsRev.forEach(c => matriceRev[c] = {});
@@ -231,25 +195,18 @@ const App = {
       const m = t.date.slice(0, 7);
       matriceRev[t.categorie][m] = (matriceRev[t.categorie][m] || 0) + t.montant;
     });
+    const totauxRev = {};
+    catsRev.forEach(c => {
+      totauxRev[c] = Object.values(matriceRev[c]).reduce((s, v) => s + v, 0);
+    });
 
-    // KPI par année
-    const annees = [...new Set(allTxns.map(t => t.date.slice(0, 4)))].sort();
-    var self = this;
-    document.getElementById('dash-kpi-annuel').innerHTML = '<div class="kpi-annuel-grille">'
-      + annees.map(function(an) {
-          var rev = credits.filter(function(t) { return t.date.startsWith(an); }).reduce(function(s, t) { return s + t.montant; }, 0);
-          var dep = depenses.filter(function(t) { return t.date.startsWith(an); }).reduce(function(s, t) { return s + t.montant; }, 0);
-          var net = rev - dep;
-          var signe = net >= 0 ? '+' : '';
-          var classeNet = net >= 0 ? 'pos' : 'neg';
-          return '<div class="kpi-annee-bloc">'
-            + '<span class="kpi-annee-titre">' + an + '</span>'
-            + '<span class="kpi-annee-item"><span class="kpi-annee-label">Revenus</span><span class="kpi-carte__valeur pos">' + self.formatMontant(rev) + '</span></span>'
-            + '<span class="kpi-annee-item"><span class="kpi-annee-label">Dépenses</span><span class="kpi-carte__valeur neg">' + self.formatMontant(dep) + '</span></span>'
-            + '<span class="kpi-annee-item kpi-annee-item--accent"><span class="kpi-annee-label">Solde net</span><span class="kpi-carte__valeur ' + classeNet + '">' + signe + self.formatMontant(Math.abs(net)) + '</span></span>'
-            + '</div>';
-        }).join('')
-      + '</div>';
+    const totalDepenses = Object.values(totauxCategorie).reduce((s, v) => s + v, 0);
+    const totalRevenus = Object.values(totauxRev).reduce((s, v) => s + v, 0);
+
+    document.getElementById('dash-revenus').textContent = this.formatMontant(totalRevenus);
+    document.getElementById('dash-depenses').textContent = this.formatMontant(totalDepenses);
+    document.getElementById('dash-net').textContent = this.formatMontant(totalRevenus - totalDepenses);
+    document.getElementById('dash-nb-mois').textContent = Math.max(mois.length, moisRev.length);
 
     const aDesDonnees = this.state.transactions.length > 0;
     document.getElementById('dashboard-vide').classList.toggle('cache', aDesDonnees);
@@ -257,22 +214,24 @@ const App = {
 
     if (!aDesDonnees) return;
 
-    // Dépenses par mois (barres empilées)
+    // Graphiques dépenses avec onClick → détail transactions
     ChartsModule.renderParMois('chart-par-mois', mois, categories, matrice, (cat, moisLabel) => {
       const txns = depenses.filter(t => t.categorie === cat && t.date.slice(0, 7) === moisLabel);
       this.ouvrirModal(`${cat} — ${ChartsModule.libelleMoisCourt(moisLabel)}`, txns);
     });
-
-    // Dépenses par catégorie et par année (barres groupées)
-    ChartsModule.renderParCategorieParAnnee('chart-par-categorie', depenses, (cat) => {
+    ChartsModule.renderParCategorie('chart-par-categorie', totauxCategorie, (cat) => {
       const txns = depenses.filter(t => t.categorie === cat);
       this.ouvrirModal(cat, txns);
     });
 
-    // Revenus par mois (barres empilées)
+    // Graphiques revenus avec onClick → détail transactions
     ChartsModule.renderParMois('chart-revenus-mois', moisRev, catsRev, matriceRev, (cat, moisLabel) => {
       const txns = credits.filter(t => t.categorie === cat && t.date.slice(0, 7) === moisLabel);
       this.ouvrirModal(`${cat} — ${ChartsModule.libelleMoisCourt(moisLabel)}`, txns);
+    });
+    ChartsModule.renderParCategorie('chart-revenus-categorie', totauxRev, (cat) => {
+      const txns = credits.filter(t => t.categorie === cat);
+      this.ouvrirModal(cat, txns);
     });
 
     this.renderBilanAnnuel();
@@ -354,7 +313,7 @@ const App = {
   // ---------------------------------------------------------------------
 
   renderAnalyses() {
-    const txns = this.transactionsPourGraphiques().filter(t => t.sens === 'debit');
+    const txns = this.transactionsNormales().filter(t => t.sens === 'debit');
     const aDesDonnees = txns.length > 0;
     document.getElementById('analyses-vide')?.classList.toggle('cache', aDesDonnees);
     document.getElementById('analyses-contenu')?.classList.toggle('cache', !aDesDonnees);
@@ -408,7 +367,7 @@ const App = {
   // ---------------------------------------------------------------------
 
   renderTableauCroise() {
-    const txns = this.transactionsPourGraphiques().filter(t => t.sens === 'debit');
+    const txns = this.transactionsNormales().filter(t => t.sens === 'debit');
     const el = document.getElementById('tableau-croise');
 
     if (txns.length === 0) {
@@ -561,40 +520,6 @@ const App = {
   // ---------------------------------------------------------------------
 
   bindEvents() {
-    // Formulaire de login
-    const formLogin = document.getElementById('form-login');
-    const doLogin = async () => {
-      const email = document.getElementById('login-email').value.trim();
-      const mdp = document.getElementById('login-mdp').value;
-      const btn = document.getElementById('btn-login');
-      const errEl = document.getElementById('login-erreur');
-      if (!email || !mdp) return;
-      btn.disabled = true;
-      btn.textContent = 'Connexion…';
-      errEl.classList.add('cache');
-      try {
-        const timeout = new Promise((_, reject) =>
-          setTimeout(() => reject(new Error('Délai dépassé — vérifie ta connexion internet.')), 12000)
-        );
-        const { data, error } = await Promise.race([
-          _db.auth.signInWithPassword({ email, password: mdp }),
-          timeout,
-        ]);
-        if (error) throw new Error(error.message);
-        await this.demarrerApp(data.user);
-      } catch(err) {
-        errEl.textContent = err.message || 'Email ou mot de passe incorrect.';
-        errEl.classList.remove('cache');
-        btn.disabled = false;
-        btn.textContent = 'Se connecter';
-      }
-    };
-    formLogin.addEventListener('submit', (ev) => { ev.preventDefault(); doLogin(); });
-    document.getElementById('btn-login').addEventListener('click', (ev) => {
-      if (ev.target.closest('form')) return; // laisse le submit gérer
-      doLogin();
-    });
-
     document.querySelectorAll('.nav-item[data-panel]').forEach(item => {
       item.addEventListener('click', () => this.allerVersPanel(item.dataset.panel));
     });
@@ -636,11 +561,6 @@ const App = {
 
     document.getElementById('btn-reset').addEventListener('click', () => this.confirmerReset());
 
-    document.getElementById('btn-logout').addEventListener('click', async () => {
-      await _db.auth.signOut();
-      location.reload();
-    });
-
     document.getElementById('modal-fermer')?.addEventListener('click', () =>
       document.getElementById('modal-detail').classList.add('cache'));
     document.getElementById('modal-detail')?.addEventListener('click', (e) => {
@@ -648,9 +568,9 @@ const App = {
     });
   },
 
-  async confirmerReset() {
+  confirmerReset() {
     if (!confirm('Cela supprime définitivement toutes les transactions importées. Continuer ?')) return;
-    await Store.resetAll();
+    Store.resetAll();
     this.state = Store.getState();
     this.renderAll();
     this.toast('Toutes les données ont été effacées.');
@@ -755,12 +675,14 @@ ${lignesMois}`;
 };
 
 document.addEventListener('DOMContentLoaded', () => {
-  App.init().catch(e => {
+  try {
+    App.init();
+  } catch(e) {
     document.body.insertAdjacentHTML('afterbegin',
       `<div style="background:#fde;border:2px solid #c00;padding:1rem 1.5rem;font-family:monospace;font-size:13px;position:fixed;top:0;left:0;right:0;z-index:9999">
         <b>Erreur JS :</b> ${e.message}<br><small>${e.stack?.split('\n')[1] || ''}</small>
       </div>`);
-  });
+  }
 });
 
 window.addEventListener('error', (e) => {
