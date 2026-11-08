@@ -264,14 +264,6 @@ button { font-family: inherit; }
 
 /* ---------- KPI ---------- */
 
-.kpi-grid {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 1em;
-  margin-bottom: 1.6em;
-}
-@media (max-width: 900px) { .kpi-grid { grid-template-columns: repeat(2, 1fr); } }
-
 .kpi-carte {
   background: var(--carte);
   border: 1px solid var(--bordure);
@@ -296,6 +288,73 @@ button { font-family: inherit; }
   font-weight: 800;
   letter-spacing: -0.02em;
   font-variant-numeric: tabular-nums;
+}
+
+/* ---------- KPI annuel ---------- */
+
+.kpi-annuel-conteneur {
+  margin-bottom: 1.6em;
+}
+
+.kpi-annuel-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--carte);
+  border: 1px solid var(--bordure);
+  border-radius: var(--rayon);
+  box-shadow: var(--ombre);
+  overflow: hidden;
+}
+
+.kpi-annuel-table tr + tr {
+  border-top: 1px solid var(--bordure);
+}
+
+.kpi-annuel-table td {
+  padding: 0.65em 1.2em;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+.kpi-an-annee {
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--accent);
+  width: 4em;
+  padding-right: 1.5em;
+}
+
+.kpi-an-cell {
+  border-left: 1px solid var(--bordure);
+  display: flex;
+  flex-direction: column;
+  gap: 0.15em;
+  min-width: 10em;
+}
+
+.kpi-an-label {
+  display: block;
+  font-size: 0.68rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--texte-sec);
+}
+
+.kpi-an-val {
+  display: block;
+  font-size: 1.05rem;
+  font-weight: 700;
+}
+
+.kpi-an-cell--net .kpi-an-label {
+  color: var(--texte-att);
+}
+
+.kpi-annee-item--accent .kpi-annee-label {
+  color: var(--texte-att);
 }
 
 /* ---------- Cartes / graphiques ---------- */
@@ -581,3 +640,62 @@ td.montant { text-align: right; font-weight: 700; white-space: nowrap; font-vari
   .topbar__droite { width: 100%; justify-content: space-between; }
   .contenu { padding: 1.2em; }
 }
+
+/* ---------- Login ---------- */
+
+.login-fond {
+  position: fixed; inset: 0; background: var(--fond);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 10000;
+}
+.login-fond.cache { display: none; }
+
+.login-boite {
+  background: #fff; border-radius: 16px;
+  box-shadow: 0 8px 40px rgba(21,24,43,.12);
+  padding: 2.5rem 2.5rem 2rem;
+  width: 100%; max-width: 400px;
+}
+
+.login-logo {
+  display: flex; align-items: center; gap: 0.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.login-titre {
+  font-size: 1.25rem; font-weight: 700;
+  color: var(--texte); margin-bottom: 1.25rem;
+}
+
+.login-champ {
+  display: flex; flex-direction: column; gap: 0.35rem;
+  margin-bottom: 1rem;
+}
+.login-champ label { font-size: 0.82rem; font-weight: 600; color: var(--texte-2); }
+.login-champ input {
+  border: 1.5px solid var(--bordure); border-radius: 8px;
+  padding: 0.6rem 0.85rem; font-size: 0.95rem; font-family: inherit;
+  color: var(--texte); background: var(--fond); transition: border-color .15s;
+}
+.login-champ input:focus { outline: none; border-color: var(--accent); }
+
+.login-btn { width: 100%; justify-content: center; margin-top: 0.5rem; }
+.login-btn:disabled { opacity: .6; cursor: wait; }
+
+.login-erreur {
+  background: #fef2f2; border: 1px solid #fca5a5;
+  color: #b91c1c; border-radius: 8px;
+  padding: 0.6rem 0.9rem; font-size: 0.85rem;
+  margin-bottom: 1rem;
+}
+
+/* Utilisateur connecté dans la sidebar */
+.sidebar__utilisateur {
+  font-size: 0.75rem; color: var(--texte-2);
+  padding: 0.4rem 0.9rem; word-break: break-all;
+}
+
+.nav-item--logout {
+  color: var(--texte-2);
+}
+.nav-item--logout:hover { color: var(--accent); background: var(--fond); }
